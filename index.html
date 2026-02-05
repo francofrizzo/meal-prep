@@ -202,31 +202,27 @@ body {
 }
 
 .queries-accordion {
-  background: #111;
-  border: 1px solid #2a2a2a;
-  border-radius: 6px;
-  margin: 8px 0;
-  font-size: 12px;
-  max-width: 90%;
+  margin: 4px 0;
+  font-size: 11px;
 }
 
 .queries-header {
-  padding: 6px 10px;
+  padding: 2px 0;
   cursor: pointer;
-  color: #888;
+  color: #555;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   user-select: none;
 }
 
 .queries-header:hover {
-  color: #aaa;
+  color: #777;
 }
 
 .queries-header::before {
   content: '▶';
-  font-size: 9px;
+  font-size: 8px;
   transition: transform 0.15s;
 }
 
@@ -236,8 +232,7 @@ body {
 
 .queries-content {
   display: none;
-  padding: 0 10px 8px 10px;
-  border-top: 1px solid #2a2a2a;
+  padding: 4px 0 4px 12px;
 }
 
 .queries-accordion.open .queries-content {
@@ -245,14 +240,15 @@ body {
 }
 
 .query-item {
-  margin: 6px 0;
-  padding: 6px 8px;
-  background: #0a0a0a;
-  border-radius: 4px;
+  margin: 2px 0;
+  padding: 3px 6px;
+  background: #0d0d0d;
+  border-radius: 3px;
   font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
   white-space: pre-wrap;
   word-break: break-all;
-  color: #7fdbca;
+  color: #4a7a6a;
 }
 
 #input-area {
