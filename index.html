@@ -62,7 +62,7 @@ body {
   overflow: hidden;
 }
 
-#config-panel {
+#toolbar {
   background: #1a1a1a;
   border-bottom: 1px solid #333;
   padding: 8px 16px;
@@ -73,12 +73,20 @@ body {
   font-size: 13px;
 }
 
-#config-panel label {
+#config-panel {
+  display: contents;
+}
+
+#config-panel.hidden {
+  display: none;
+}
+
+#toolbar label {
   color: #888;
   white-space: nowrap;
 }
 
-#config-panel input, #config-panel select {
+#toolbar input, #toolbar select {
   background: #0a0a0a;
   border: 1px solid #333;
   color: #d4d4d4;
@@ -89,7 +97,7 @@ body {
   border-radius: 6px;
 }
 
-#config-panel input:focus {
+#toolbar input:focus {
   border-color: #666;
 }
 
@@ -97,7 +105,7 @@ body {
 #model-name { width: 180px; }
 #api-key { width: 200px; }
 
-#config-panel button {
+#toolbar button {
   background: #333;
   border: 1px solid #555;
   color: #d4d4d4;
@@ -108,11 +116,11 @@ body {
   border-radius: 6px;
 }
 
-#config-panel button:hover {
+#toolbar button:hover {
   background: #444;
 }
 
-#config-panel .config-group {
+#toolbar .config-group {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -191,6 +199,60 @@ body {
   max-height: 200px;
   overflow-y: auto;
   border-radius: 6px;
+}
+
+.queries-accordion {
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  margin: 8px 0;
+  font-size: 12px;
+  max-width: 90%;
+}
+
+.queries-header {
+  padding: 6px 10px;
+  cursor: pointer;
+  color: #888;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+
+.queries-header:hover {
+  color: #aaa;
+}
+
+.queries-header::before {
+  content: '▶';
+  font-size: 9px;
+  transition: transform 0.15s;
+}
+
+.queries-accordion.open .queries-header::before {
+  transform: rotate(90deg);
+}
+
+.queries-content {
+  display: none;
+  padding: 0 10px 8px 10px;
+  border-top: 1px solid #2a2a2a;
+}
+
+.queries-accordion.open .queries-content {
+  display: block;
+}
+
+.query-item {
+  margin: 6px 0;
+  padding: 6px 8px;
+  background: #0a0a0a;
+  border-radius: 4px;
+  font-family: 'IBM Plex Mono', monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #7fdbca;
 }
 
 #input-area {
@@ -504,38 +566,40 @@ body {
 </head>
 <body>
 
-<div id="config-panel">
+<div id="toolbar">
   <button id="history-toggle">chats</button>
-  <div class="config-group">
-    <label for="api-provider">Provider:</label>
-    <select id="api-provider">
-      <option value="">Custom</option>
-      <option value="openai">OpenAI</option>
-      <option value="anthropic">Anthropic</option>
-      <option value="groq">Groq</option>
-      <option value="together">Together AI</option>
-      <option value="mistral">Mistral</option>
-      <option value="openrouter">OpenRouter</option>
-    </select>
+  <div id="config-panel">
+    <div class="config-group">
+      <label for="api-provider">Provider:</label>
+      <select id="api-provider">
+        <option value="">Custom</option>
+        <option value="openai">OpenAI</option>
+        <option value="anthropic">Anthropic</option>
+        <option value="groq">Groq</option>
+        <option value="together">Together AI</option>
+        <option value="mistral">Mistral</option>
+        <option value="openrouter">OpenRouter</option>
+      </select>
+    </div>
+    <div class="config-group">
+      <label for="api-base-url">URL:</label>
+      <input type="text" id="api-base-url" placeholder="https://api.openai.com/v1">
+    </div>
+    <div class="config-group">
+      <label for="model-name">Model:</label>
+      <input type="text" id="model-name" placeholder="gpt-5-2">
+    </div>
+    <div class="config-group">
+      <label for="api-key">Key:</label>
+      <input type="password" id="api-key" placeholder="sk-...">
+    </div>
+    <button id="save-config-btn">Save</button>
+    <button id="download-db-btn">Download DB</button>
+    <button id="download-sql-btn">Download SQL</button>
+    <button id="upload-db-btn">Upload DB</button>
+    <input type="file" id="upload-db-input" accept=".db,.sqlite,.sqlite3" style="display:none">
+    <button id="reset-db-btn">Reset DB</button>
   </div>
-  <div class="config-group">
-    <label for="api-base-url">URL:</label>
-    <input type="text" id="api-base-url" placeholder="https://api.openai.com/v1">
-  </div>
-  <div class="config-group">
-    <label for="model-name">Model:</label>
-    <input type="text" id="model-name" placeholder="gpt-5-2">
-  </div>
-  <div class="config-group">
-    <label for="api-key">Key:</label>
-    <input type="password" id="api-key" placeholder="sk-...">
-  </div>
-  <button id="save-config-btn">Save</button>
-  <button id="download-db-btn">Download DB</button>
-  <button id="download-sql-btn">Download SQL</button>
-  <button id="upload-db-btn">Upload DB</button>
-  <input type="file" id="upload-db-input" accept=".db,.sqlite,.sqlite3" style="display:none">
-  <button id="reset-db-btn">Reset DB</button>
   <button id="config-toggle">cfg</button>
 </div>
 
@@ -1109,6 +1173,52 @@ KEY BEHAVIORS:
     if (el) el.remove();
   }
 
+  function createQueriesAccordion() {
+    const existing = document.getElementById('queries-accordion');
+    if (existing) return existing;
+
+    const accordion = document.createElement('div');
+    accordion.className = 'queries-accordion';
+    accordion.id = 'queries-accordion';
+
+    const header = document.createElement('div');
+    header.className = 'queries-header';
+    header.innerHTML = '<span class="queries-label">Running queries...</span>';
+    header.addEventListener('click', () => {
+      accordion.classList.toggle('open');
+    });
+
+    const content = document.createElement('div');
+    content.className = 'queries-content';
+
+    accordion.appendChild(header);
+    accordion.appendChild(content);
+    chatContainer.appendChild(accordion);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    return accordion;
+  }
+
+  function addQueryToAccordion(query) {
+    const accordion = createQueriesAccordion();
+    const content = accordion.querySelector('.queries-content');
+    const label = accordion.querySelector('.queries-label');
+    
+    const queryItem = document.createElement('div');
+    queryItem.className = 'query-item';
+    queryItem.textContent = query;
+    content.appendChild(queryItem);
+
+    const count = content.querySelectorAll('.query-item').length;
+    label.textContent = `${count} ${count === 1 ? 'query' : 'queries'} executed`;
+    
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
+
+  function removeQueriesAccordion() {
+    const el = document.getElementById('queries-accordion');
+    if (el) el.remove();
+  }
+
   // ─── Conversation Management ────────────────────────────────────────
   function generateConversationId() {
     return 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
@@ -1406,6 +1516,9 @@ KEY BEHAVIORS:
   async function handleUserMessage(text) {
     if (!text.trim()) return;
 
+    // Clear any previous query accordion
+    removeQueriesAccordion();
+
     // Add user message to UI and history
     addMessage('user', text);
     conversationHistory.push({ role: 'user', content: text });
@@ -1477,6 +1590,9 @@ KEY BEHAVIORS:
               } catch (e) {
                 args = { query: toolCall.function.arguments };
               }
+
+              // Show query in accordion
+              addQueryToAccordion(args.query);
 
               const result = executeSQL(args.query);
               const resultStr = JSON.stringify(result, null, 2);
@@ -1583,7 +1699,7 @@ KEY BEHAVIORS:
   });
 
   configToggle.addEventListener('click', () => {
-    configPanel.style.display = configPanel.style.display === 'none' ? 'flex' : 'none';
+    configPanel.classList.toggle('hidden');
   });
 
   historyToggle.addEventListener('click', toggleHistoryPanel);
@@ -1599,6 +1715,11 @@ KEY BEHAVIORS:
       addMessage('system', 'Meal Prep Chat ready. Configure your API settings above, then start chatting.');
     }
     userInput.focus();
+  });
+
+  // Save conversations before page unload
+  window.addEventListener('beforeunload', () => {
+    saveCurrentConversation();
   });
 
 })();
