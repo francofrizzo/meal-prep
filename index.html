@@ -648,8 +648,6 @@ body {
     CREATE TABLE IF NOT EXISTS ingredients (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      quantity TEXT,
-      unit TEXT,
       type TEXT CHECK(type IN ('Meat','Poultry','Fish','Vegetables','Fruits','Dairy','Deli/Cheese','Pantry/Canned','Condiments','Other'))
     );
 
@@ -674,6 +672,8 @@ body {
     CREATE TABLE IF NOT EXISTS step_ingredients (
       step_id TEXT NOT NULL,
       ingredient_id TEXT NOT NULL,
+      quantity TEXT,
+      unit TEXT,
       PRIMARY KEY (step_id, ingredient_id),
       FOREIGN KEY (step_id) REFERENCES steps(id),
       FOREIGN KEY (ingredient_id) REFERENCES ingredients(id)
@@ -749,10 +749,10 @@ By default, use Argentine Spanish for all text, both in chat and in the database
 
 SCHEMA:
 recipes (id TEXT PK, name, type ['main'|'side'], servings INT, yield_amount REAL, yield_unit, frozen_shelf_life_days INT, fridge_shelf_life_days INT)
-ingredients (id TEXT PK, name, quantity, unit, type ['Meat'|'Poultry'|'Fish'|'Vegetables'|'Fruits'|'Dairy'|'Deli/Cheese'|'Pantry/Canned'|'Condiments'|'Other'])
+ingredients (id TEXT PK, name, type ['Meat'|'Poultry'|'Fish'|'Vegetables'|'Fruits'|'Dairy'|'Deli/Cheese'|'Pantry/Canned'|'Condiments'|'Other'])
 steps (id TEXT PK, recipe_id FK, description, phase ['meal-prep'|'day-of-eating'], order_num INT, duration_minutes INT)
 step_dependencies (step_id FK, depends_on_step_id FK) — composite PK
-step_ingredients (step_id FK, ingredient_id FK) — composite PK
+step_ingredients (step_id FK, ingredient_id FK, quantity, unit) — composite PK
 resources (id TEXT PK, name, type ['oven'|'pan'|'pot'|'stove'])
 step_resource_usage (step_id FK, resource_id FK, temperature_celsius INT, notes) — composite PK
 meal_prep_sessions (id TEXT PK, date, notes)
@@ -900,6 +900,41 @@ KEY BEHAVIORS:
           FROM ingredients`);
         db.run('DROP TABLE ingredients');
         db.run('ALTER TABLE ingredients_new RENAME TO ingredients');
+        db.run('PRAGMA foreign_keys = ON');
+      }
+    }
+
+    // Migration: move quantity/unit from ingredients to step_ingredients
+    const ingredientCols = db.exec("PRAGMA table_info(ingredients)");
+    if (ingredientCols.length > 0) {
+      const colNames = ingredientCols[0].values.map(r => r[1]);
+      if (colNames.includes('quantity')) {
+        db.run('PRAGMA foreign_keys = OFF');
+        
+        // Add quantity/unit columns to step_ingredients if they don't exist
+        const stepIngCols = db.exec("PRAGMA table_info(step_ingredients)");
+        const stepIngColNames = stepIngCols.length > 0 ? stepIngCols[0].values.map(r => r[1]) : [];
+        if (!stepIngColNames.includes('quantity')) {
+          db.run("ALTER TABLE step_ingredients ADD COLUMN quantity TEXT");
+          db.run("ALTER TABLE step_ingredients ADD COLUMN unit TEXT");
+        }
+        
+        // Migrate quantity/unit data from ingredients to step_ingredients
+        db.run(`UPDATE step_ingredients SET 
+          quantity = (SELECT quantity FROM ingredients WHERE ingredients.id = step_ingredients.ingredient_id),
+          unit = (SELECT unit FROM ingredients WHERE ingredients.id = step_ingredients.ingredient_id)
+          WHERE quantity IS NULL`);
+        
+        // Recreate ingredients table without quantity/unit
+        db.run(`CREATE TABLE ingredients_new (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          type TEXT CHECK(type IN ('Meat','Poultry','Fish','Vegetables','Fruits','Dairy','Deli/Cheese','Pantry/Canned','Condiments','Other'))
+        )`);
+        db.run(`INSERT INTO ingredients_new (id, name, type) SELECT id, name, type FROM ingredients`);
+        db.run('DROP TABLE ingredients');
+        db.run('ALTER TABLE ingredients_new RENAME TO ingredients');
+        
         db.run('PRAGMA foreign_keys = ON');
       }
     }
