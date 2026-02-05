@@ -18,7 +18,7 @@
     - OpenAI: https://api.openai.com/v1
     - Anthropic: https://api.anthropic.com/v1
     - Other OpenAI-compatible providers: use their respective base URLs
-  - Model: The model name to use (e.g., gpt-4o, claude-sonnet-4-20250514)
+  - Model: The model name to use (e.g., gpt-5-2, claude-sonnet-4-5-20250929)
   - API Key: Your API key for the selected provider
 
   EXAMPLE QUERIES:
@@ -430,7 +430,7 @@ body {
   </div>
   <div class="config-group">
     <label for="model-name">Model:</label>
-    <input type="text" id="model-name" placeholder="gpt-4o">
+    <input type="text" id="model-name" placeholder="gpt-5-2">
   </div>
   <div class="config-group">
     <label for="api-key">Key:</label>
@@ -698,12 +698,12 @@ Be concise and helpful. When the user's request is ambiguous, ask clarifying que
   const historyList = document.getElementById('history-list');
 
   const API_PROVIDERS = {
-    openai:     { url: 'https://api.openai.com/v1',            model: 'gpt-4o' },
-    anthropic:  { url: 'https://api.anthropic.com/v1',          model: 'claude-sonnet-4-20250514' },
+    openai:     { url: 'https://api.openai.com/v1',            model: 'gpt-5-2' },
+    anthropic:  { url: 'https://api.anthropic.com/v1',          model: 'claude-sonnet-4-5-20250929' },
     groq:       { url: 'https://api.groq.com/openai/v1',       model: 'llama-3.3-70b-versatile' },
     together:   { url: 'https://api.together.xyz/v1',           model: 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo' },
     mistral:    { url: 'https://api.mistral.ai/v1',             model: 'mistral-large-latest' },
-    openrouter: { url: 'https://openrouter.ai/api/v1',          model: 'openai/gpt-4o' },
+    openrouter: { url: 'https://openrouter.ai/api/v1',          model: 'openai/gpt-5-2' },
   };
 
   // ─── Database ────────────────────────────────────────────────────────
@@ -1216,12 +1216,18 @@ Be concise and helpful. When the user's request is ambiguous, ask clarifying que
       tool_choice: 'auto'
     };
 
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.apiKey}`
+    };
+    // Anthropic requires this header for CORS / direct browser access (BYOK use case).
+    if (baseUrl.includes('api.anthropic.com')) {
+      headers['anthropic-dangerous-direct-browser-access'] = 'true';
+    }
+
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`
-      },
+      headers,
       body: JSON.stringify(body)
     });
 
