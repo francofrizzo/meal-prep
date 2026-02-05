@@ -1,0 +1,889 @@
+<!--
+  Meal Prep Chat Application
+  ==========================
+
+  A browser-based chat application for managing meal preparation, recipes,
+  meal planning, and inventory tracking. Users interact with an LLM through
+  a chat interface to store recipes, plan meals, track batches, and query
+  their meal prep data using natural language.
+
+  HOW TO USE:
+  1. Open this file in a modern browser (Chrome, Firefox, Safari, Edge)
+  2. Configure your API provider, model name, and API key in the settings panel
+  3. Start chatting! Ask the assistant to create recipes, plan meals, track
+     meal prep sessions, and query your data.
+
+  CONFIGURATION:
+  - API Base URL: The base URL for your LLM provider's API
+    - OpenAI: https://api.openai.com/v1
+    - Anthropic: https://api.anthropic.com/v1
+    - Other OpenAI-compatible providers: use their respective base URLs
+  - Model: The model name to use (e.g., gpt-4o, claude-sonnet-4-20250514)
+  - API Key: Your API key for the selected provider
+
+  EXAMPLE QUERIES:
+  - "Add a recipe for chicken curry with rice"
+  - "Plan next week's meals"
+  - "Record a meal prep session for today"
+  - "How many servings of pasta do I have left?"
+  - "Which batches are about to expire?"
+  - "What recipes use chicken?"
+  - "Show me all my recipes"
+
+  TROUBLESHOOTING:
+  - If the database seems corrupted, click "Reset Database" in the settings
+  - If API calls fail, verify your API key and base URL
+  - Data is stored in localStorage; clearing browser data will erase it
+  - The database is limited to ~5MB due to localStorage constraints
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meal Prep Chat</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Courier New', Courier, monospace;
+  background: #0a0a0a;
+  color: #d4d4d4;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#config-panel {
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+#config-panel label {
+  color: #888;
+  white-space: nowrap;
+}
+
+#config-panel input, #config-panel select {
+  background: #0a0a0a;
+  border: 1px solid #333;
+  color: #d4d4d4;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  padding: 4px 8px;
+  outline: none;
+}
+
+#config-panel input:focus {
+  border-color: #666;
+}
+
+#api-base-url { width: 260px; }
+#model-name { width: 180px; }
+#api-key { width: 200px; }
+
+#config-panel button {
+  background: #333;
+  border: 1px solid #555;
+  color: #d4d4d4;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+#config-panel button:hover {
+  background: #444;
+}
+
+#config-panel .config-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#config-toggle {
+  background: none;
+  border: 1px solid #333;
+  color: #888;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+  position: fixed;
+  top: 4px;
+  right: 8px;
+  z-index: 10;
+}
+
+#config-toggle:hover { color: #d4d4d4; }
+
+#chat-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message {
+  max-width: 90%;
+  padding: 8px 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-size: 14px;
+}
+
+.message-user {
+  align-self: flex-end;
+  color: #7fdbca;
+}
+
+.message-user::before {
+  content: '> ';
+  color: #555;
+}
+
+.message-assistant {
+  align-self: flex-start;
+  color: #c5c8c6;
+}
+
+.message-system {
+  align-self: center;
+  color: #666;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.message-error {
+  align-self: center;
+  color: #cc6666;
+  font-size: 13px;
+}
+
+.sql-result {
+  background: #111;
+  border: 1px solid #2a2a2a;
+  padding: 6px 10px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #999;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+#input-area {
+  border-top: 1px solid #333;
+  padding: 12px 16px;
+  display: flex;
+  gap: 8px;
+  background: #111;
+}
+
+#user-input {
+  flex: 1;
+  background: #0a0a0a;
+  border: 1px solid #333;
+  color: #d4d4d4;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  padding: 8px 12px;
+  outline: none;
+  resize: none;
+  min-height: 20px;
+  max-height: 120px;
+}
+
+#user-input:focus {
+  border-color: #666;
+}
+
+#send-btn {
+  background: #333;
+  border: 1px solid #555;
+  color: #d4d4d4;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  padding: 8px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#send-btn:hover { background: #444; }
+#send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.typing-indicator {
+  color: #666;
+  font-size: 13px;
+  padding: 4px 12px;
+}
+
+.typing-indicator::after {
+  content: '';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0%   { content: ''; }
+  25%  { content: '.'; }
+  50%  { content: '..'; }
+  75%  { content: '...'; }
+  100% { content: ''; }
+}
+</style>
+</head>
+<body>
+
+<div id="config-panel">
+  <div class="config-group">
+    <label for="api-base-url">URL:</label>
+    <input type="text" id="api-base-url" placeholder="https://api.openai.com/v1">
+  </div>
+  <div class="config-group">
+    <label for="model-name">Model:</label>
+    <input type="text" id="model-name" placeholder="gpt-4o">
+  </div>
+  <div class="config-group">
+    <label for="api-key">Key:</label>
+    <input type="password" id="api-key" placeholder="sk-...">
+  </div>
+  <button id="save-config-btn">Save</button>
+  <button id="reset-db-btn">Reset DB</button>
+</div>
+<button id="config-toggle">cfg</button>
+
+<div id="chat-container"></div>
+
+<div id="input-area">
+  <input type="text" id="user-input" placeholder="Type a message..." autocomplete="off">
+  <button id="send-btn">Send</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // ─── Constants ───────────────────────────────────────────────────────
+  const LS_KEY_DB = 'mealprep_db';
+  const LS_KEY_CONFIG = 'mealprep_config';
+  const LS_KEY_CHAT = 'mealprep_chat';
+
+  // ─── Schema ──────────────────────────────────────────────────────────
+  const SCHEMA_SQL = `
+    CREATE TABLE IF NOT EXISTS recipes (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      servings INTEGER,
+      yield_amount REAL,
+      yield_unit TEXT,
+      frozen_shelf_life_days INTEGER,
+      fridge_shelf_life_days INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS ingredients (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      quantity TEXT,
+      unit TEXT,
+      type TEXT CHECK(type IN ('Carne','Pollo','Pescado','Verduras','Frutas','Lacteos','Fiambres-Quesos','Secos-Enlatados','Condimentos','Otros'))
+    );
+
+    CREATE TABLE IF NOT EXISTS steps (
+      id TEXT PRIMARY KEY,
+      recipe_id TEXT NOT NULL,
+      description TEXT NOT NULL,
+      phase TEXT CHECK(phase IN ('meal-prep','day-of-eating')),
+      order_num INTEGER,
+      duration_minutes INTEGER,
+      FOREIGN KEY (recipe_id) REFERENCES recipes(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS step_dependencies (
+      step_id TEXT NOT NULL,
+      depends_on_step_id TEXT NOT NULL,
+      PRIMARY KEY (step_id, depends_on_step_id),
+      FOREIGN KEY (step_id) REFERENCES steps(id),
+      FOREIGN KEY (depends_on_step_id) REFERENCES steps(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS step_ingredients (
+      step_id TEXT NOT NULL,
+      ingredient_id TEXT NOT NULL,
+      PRIMARY KEY (step_id, ingredient_id),
+      FOREIGN KEY (step_id) REFERENCES steps(id),
+      FOREIGN KEY (ingredient_id) REFERENCES ingredients(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS resources (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      type TEXT CHECK(type IN ('oven','pan','pot','stove'))
+    );
+
+    CREATE TABLE IF NOT EXISTS step_resource_usage (
+      step_id TEXT NOT NULL,
+      resource_id TEXT NOT NULL,
+      temperature_celsius INTEGER,
+      notes TEXT,
+      PRIMARY KEY (step_id, resource_id),
+      FOREIGN KEY (step_id) REFERENCES steps(id),
+      FOREIGN KEY (resource_id) REFERENCES resources(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS meal_prep_sessions (
+      id TEXT PRIMARY KEY,
+      date TEXT NOT NULL,
+      notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS batches (
+      id TEXT PRIMARY KEY,
+      recipe_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      servings_produced INTEGER NOT NULL,
+      prep_date TEXT NOT NULL,
+      FOREIGN KEY (recipe_id) REFERENCES recipes(id),
+      FOREIGN KEY (session_id) REFERENCES meal_prep_sessions(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS consumptions (
+      id TEXT PRIMARY KEY,
+      batch_id TEXT NOT NULL,
+      servings_consumed INTEGER NOT NULL,
+      consumption_date TEXT NOT NULL,
+      FOREIGN KEY (batch_id) REFERENCES batches(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS weeks (
+      id TEXT PRIMARY KEY,
+      start_date TEXT NOT NULL,
+      notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS meal_plan_slots (
+      id TEXT PRIMARY KEY,
+      week_id TEXT NOT NULL,
+      day_of_week TEXT CHECK(day_of_week IN ('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')),
+      meal_type TEXT CHECK(meal_type IN ('lunch','dinner')),
+      recipe_id TEXT,
+      FOREIGN KEY (week_id) REFERENCES weeks(id),
+      FOREIGN KEY (recipe_id) REFERENCES recipes(id)
+    );
+  `;
+
+  // ─── System Prompt ───────────────────────────────────────────────────
+  const SYSTEM_PROMPT = `You are a helpful assistant for managing a meal prep system. You have access to a SQLite database through the execute_sql tool. Use it to create, read, update, and delete data as the user requests.
+
+DATABASE SCHEMA:
+================
+
+recipes (id TEXT PK, name TEXT, servings INT, yield_amount REAL, yield_unit TEXT, frozen_shelf_life_days INT, fridge_shelf_life_days INT)
+
+ingredients (id TEXT PK, name TEXT, quantity TEXT, unit TEXT, type TEXT)
+  - type must be one of: Carne, Pollo, Pescado, Verduras, Frutas, Lacteos, Fiambres-Quesos, Secos-Enlatados, Condimentos, Otros
+
+steps (id TEXT PK, recipe_id TEXT FK->recipes, description TEXT, phase TEXT, order_num INT, duration_minutes INT)
+  - phase must be: 'meal-prep' or 'day-of-eating'
+
+step_dependencies (step_id TEXT FK->steps, depends_on_step_id TEXT FK->steps) - composite PK
+
+step_ingredients (step_id TEXT FK->steps, ingredient_id TEXT FK->ingredients) - composite PK
+
+resources (id TEXT PK, name TEXT, type TEXT)
+  - type must be: oven, pan, pot, stove
+
+step_resource_usage (step_id TEXT FK->steps, resource_id TEXT FK->resources, temperature_celsius INT, notes TEXT) - composite PK
+
+meal_prep_sessions (id TEXT PK, date TEXT, notes TEXT)
+
+batches (id TEXT PK, recipe_id TEXT FK->recipes, session_id TEXT FK->meal_prep_sessions, servings_produced INT, prep_date TEXT)
+
+consumptions (id TEXT PK, batch_id TEXT FK->batches, servings_consumed INT, consumption_date TEXT)
+
+weeks (id TEXT PK, start_date TEXT, notes TEXT)
+
+meal_plan_slots (id TEXT PK, week_id TEXT FK->weeks, day_of_week TEXT, meal_type TEXT, recipe_id TEXT FK->recipes)
+  - day_of_week: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday
+  - meal_type: lunch, dinner
+
+RELATIONSHIPS:
+- A recipe has many steps, each step can use ingredients and resources
+- Steps can depend on other steps (step_dependencies)
+- Meal prep sessions produce batches of recipes
+- Batches are consumed over time (consumptions)
+- Weeks contain meal plan slots that assign recipes to specific days and meals
+
+GUIDELINES:
+- Generate IDs using descriptive prefixes with incrementing numbers. Before inserting, query for existing IDs with that prefix to find the next number. Examples: recipe_1, ingredient_5, step_3, batch_12
+- Use ISO 8601 date format (YYYY-MM-DD) for all dates
+- When creating recipes, gather all necessary details from the user
+- For complex operations, use multiple queries as needed
+- Always confirm successful operations to the user
+- To calculate current stock for a batch: servings_produced - COALESCE(SUM(servings_consumed), 0)
+- When inserting multiple rows, you can use multiple INSERT statements in a single execute_sql call separated by semicolons, or make multiple tool calls
+- Today's date is available if the user refers to "today", "this week", etc. — use your best judgment based on context.
+
+COMMON QUERY PATTERNS:
+
+1. Current stock per recipe:
+   SELECT r.name, b.id as batch_id, b.servings_produced, COALESCE(SUM(c.servings_consumed),0) as consumed, b.servings_produced - COALESCE(SUM(c.servings_consumed),0) as remaining
+   FROM batches b
+   JOIN recipes r ON b.recipe_id = r.id
+   LEFT JOIN consumptions c ON c.batch_id = b.id
+   GROUP BY b.id
+   HAVING remaining > 0
+
+2. Recipes running low (planned but insufficient stock):
+   SELECT r.name, mps.day_of_week, mps.meal_type, COALESCE(stock.total_remaining, 0) as servings_available
+   FROM meal_plan_slots mps
+   JOIN recipes r ON mps.recipe_id = r.id
+   LEFT JOIN (
+     SELECT b.recipe_id, SUM(b.servings_produced - COALESCE(cons.consumed, 0)) as total_remaining
+     FROM batches b
+     LEFT JOIN (SELECT batch_id, SUM(servings_consumed) as consumed FROM consumptions GROUP BY batch_id) cons ON cons.batch_id = b.id
+     GROUP BY b.recipe_id
+   ) stock ON stock.recipe_id = r.id
+
+3. Batches expiring soon (fridge):
+   SELECT r.name, b.prep_date, r.fridge_shelf_life_days,
+     date(b.prep_date, '+' || r.fridge_shelf_life_days || ' days') as expires_on
+   FROM batches b
+   JOIN recipes r ON b.recipe_id = r.id
+   WHERE r.fridge_shelf_life_days IS NOT NULL
+
+Be concise and helpful. When the user's request is ambiguous, ask clarifying questions. Format responses clearly — use simple text lists and tables when presenting data.`;
+
+  // ─── State ───────────────────────────────────────────────────────────
+  let db = null;
+  let conversationHistory = [];
+
+  // ─── DOM Elements ────────────────────────────────────────────────────
+  const chatContainer = document.getElementById('chat-container');
+  const userInput = document.getElementById('user-input');
+  const sendBtn = document.getElementById('send-btn');
+  const configPanel = document.getElementById('config-panel');
+  const configToggle = document.getElementById('config-toggle');
+  const apiBaseUrlInput = document.getElementById('api-base-url');
+  const modelNameInput = document.getElementById('model-name');
+  const apiKeyInput = document.getElementById('api-key');
+  const saveConfigBtn = document.getElementById('save-config-btn');
+  const resetDbBtn = document.getElementById('reset-db-btn');
+
+  // ─── Database ────────────────────────────────────────────────────────
+  async function initDatabase() {
+    const SQL = await initSqlJs({
+      locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
+    });
+
+    const savedDb = localStorage.getItem(LS_KEY_DB);
+    if (savedDb) {
+      try {
+        const buf = Uint8Array.from(atob(savedDb), c => c.charCodeAt(0));
+        db = new SQL.Database(buf);
+      } catch (e) {
+        console.error('Failed to load saved database, creating new one:', e);
+        db = new SQL.Database();
+      }
+    } else {
+      db = new SQL.Database();
+    }
+
+    // Enable foreign keys and ensure schema exists
+    db.run('PRAGMA foreign_keys = ON;');
+    db.run(SCHEMA_SQL);
+    saveDatabase();
+  }
+
+  function saveDatabase() {
+    if (!db) return;
+    try {
+      const data = db.export();
+      let binary = '';
+      const chunkSize = 8192;
+      for (let i = 0; i < data.length; i += chunkSize) {
+        binary += String.fromCharCode.apply(null, data.subarray(i, i + chunkSize));
+      }
+      const b64 = btoa(binary);
+      localStorage.setItem(LS_KEY_DB, b64);
+    } catch (e) {
+      console.error('Failed to save database:', e);
+    }
+  }
+
+  function executeSQL(query) {
+    if (!db) return { error: 'Database not initialized' };
+    try {
+      // Split on semicolons but respect quoted strings
+      const stmts = splitStatements(query);
+      const allResults = [];
+
+      for (const stmt of stmts) {
+        const trimmed = stmt.trim();
+        if (!trimmed) continue;
+
+        const upper = trimmed.toUpperCase();
+        if (upper.startsWith('SELECT') || upper.startsWith('PRAGMA') || upper.startsWith('WITH') || upper.startsWith('EXPLAIN')) {
+          const res = db.exec(trimmed);
+          if (res.length > 0) {
+            const rows = res[0].values.map(row => {
+              const obj = {};
+              res[0].columns.forEach((col, i) => { obj[col] = row[i]; });
+              return obj;
+            });
+            allResults.push({ columns: res[0].columns, rows: rows, rowCount: rows.length });
+          } else {
+            allResults.push({ columns: [], rows: [], rowCount: 0 });
+          }
+        } else {
+          db.run(trimmed);
+          const changes = db.getRowsModified();
+          allResults.push({ rowsAffected: changes });
+        }
+      }
+
+      saveDatabase();
+
+      if (allResults.length === 1) return allResults[0];
+      return allResults;
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  function splitStatements(sql) {
+    const stmts = [];
+    let current = '';
+    let inSingle = false;
+    let inDouble = false;
+
+    for (let i = 0; i < sql.length; i++) {
+      const ch = sql[i];
+      if (ch === "'" && !inDouble) {
+        inSingle = !inSingle;
+      } else if (ch === '"' && !inSingle) {
+        inDouble = !inDouble;
+      } else if (ch === ';' && !inSingle && !inDouble) {
+        stmts.push(current);
+        current = '';
+        continue;
+      }
+      current += ch;
+    }
+    if (current.trim()) stmts.push(current);
+    return stmts;
+  }
+
+  // ─── Configuration ──────────────────────────────────────────────────
+  function loadConfig() {
+    try {
+      const saved = localStorage.getItem(LS_KEY_CONFIG);
+      if (saved) {
+        const config = JSON.parse(saved);
+        apiBaseUrlInput.value = config.baseUrl || '';
+        modelNameInput.value = config.model || '';
+        apiKeyInput.value = config.apiKey || '';
+      }
+    } catch (e) {
+      console.error('Failed to load config:', e);
+    }
+  }
+
+  function saveConfig() {
+    const config = {
+      baseUrl: apiBaseUrlInput.value.trim(),
+      model: modelNameInput.value.trim(),
+      apiKey: apiKeyInput.value.trim()
+    };
+    localStorage.setItem(LS_KEY_CONFIG, JSON.stringify(config));
+    addMessage('system', 'Configuration saved.');
+  }
+
+  function getConfig() {
+    return {
+      baseUrl: apiBaseUrlInput.value.trim(),
+      model: modelNameInput.value.trim(),
+      apiKey: apiKeyInput.value.trim()
+    };
+  }
+
+  // ─── Chat UI ─────────────────────────────────────────────────────────
+  function addMessage(role, content) {
+    const div = document.createElement('div');
+    div.className = `message message-${role}`;
+    div.textContent = content;
+    chatContainer.appendChild(div);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    return div;
+  }
+
+  function addTypingIndicator() {
+    const div = document.createElement('div');
+    div.className = 'typing-indicator';
+    div.textContent = 'Thinking';
+    div.id = 'typing';
+    chatContainer.appendChild(div);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    return div;
+  }
+
+  function removeTypingIndicator() {
+    const el = document.getElementById('typing');
+    if (el) el.remove();
+  }
+
+  function loadChatHistory() {
+    try {
+      const saved = localStorage.getItem(LS_KEY_CHAT);
+      if (saved) {
+        conversationHistory = JSON.parse(saved);
+        for (const msg of conversationHistory) {
+          if (msg.role === 'user') {
+            addMessage('user', msg.content);
+          } else if (msg.role === 'assistant' && typeof msg.content === 'string') {
+            addMessage('assistant', msg.content);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load chat history:', e);
+      conversationHistory = [];
+    }
+  }
+
+  function saveChatHistory() {
+    try {
+      // Only save the text messages, not tool call details
+      const toSave = conversationHistory.filter(m =>
+        (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string'
+      );
+      localStorage.setItem(LS_KEY_CHAT, JSON.stringify(toSave));
+    } catch (e) {
+      console.error('Failed to save chat history:', e);
+    }
+  }
+
+  // ─── LLM Integration ────────────────────────────────────────────────
+  const TOOL_DEFINITION = {
+    type: 'function',
+    function: {
+      name: 'execute_sql',
+      description: 'Execute one or more SQL statements against the SQLite database. Supports SELECT, INSERT, UPDATE, DELETE, and other SQL operations. Multiple statements can be separated by semicolons.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'The SQL query or queries to execute. Multiple statements can be separated by semicolons.'
+          }
+        },
+        required: ['query']
+      }
+    }
+  };
+
+  async function callLLM(messages) {
+    const config = getConfig();
+
+    if (!config.baseUrl || !config.model || !config.apiKey) {
+      throw new Error('Please configure API URL, model, and API key in the settings panel.');
+    }
+
+    let baseUrl = config.baseUrl.replace(/\/+$/, '');
+    // Ensure we have the chat completions endpoint
+    const endpoint = `${baseUrl}/chat/completions`;
+
+    const body = {
+      model: config.model,
+      messages: messages,
+      tools: [TOOL_DEFINITION],
+      tool_choice: 'auto'
+    };
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API error (${response.status}): ${errorText}`);
+    }
+
+    return await response.json();
+  }
+
+  async function handleUserMessage(text) {
+    if (!text.trim()) return;
+
+    // Add user message to UI and history
+    addMessage('user', text);
+    conversationHistory.push({ role: 'user', content: text });
+    saveChatHistory();
+
+    sendBtn.disabled = true;
+    userInput.disabled = true;
+
+    const typingEl = addTypingIndicator();
+
+    try {
+      // Build messages array with system prompt
+      let messages = [
+        { role: 'system', content: SYSTEM_PROMPT },
+        ...conversationHistory
+      ];
+
+      // Iterative tool-call loop
+      let maxIterations = 20;
+      let iteration = 0;
+
+      while (iteration < maxIterations) {
+        iteration++;
+
+        const response = await callLLM(messages);
+        const choice = response.choices && response.choices[0];
+
+        if (!choice) {
+          throw new Error('No response from LLM');
+        }
+
+        const message = choice.message;
+
+        // Check if there are tool calls
+        if (message.tool_calls && message.tool_calls.length > 0) {
+          // Add assistant message with tool calls to history
+          conversationHistory.push({
+            role: 'assistant',
+            content: message.content || null,
+            tool_calls: message.tool_calls
+          });
+
+          // If there's text content alongside tool calls, display it
+          if (message.content) {
+            removeTypingIndicator();
+            addMessage('assistant', message.content);
+            addTypingIndicator();
+          }
+
+          // Update messages for next iteration
+          messages.push({
+            role: 'assistant',
+            content: message.content || null,
+            tool_calls: message.tool_calls
+          });
+
+          // Process each tool call
+          for (const toolCall of message.tool_calls) {
+            if (toolCall.function.name === 'execute_sql') {
+              let args;
+              try {
+                args = JSON.parse(toolCall.function.arguments);
+              } catch (e) {
+                args = { query: toolCall.function.arguments };
+              }
+
+              const result = executeSQL(args.query);
+              const resultStr = JSON.stringify(result, null, 2);
+
+              // Add tool result to history and messages
+              const toolResult = {
+                role: 'tool',
+                tool_call_id: toolCall.id,
+                content: resultStr
+              };
+              conversationHistory.push(toolResult);
+              messages.push(toolResult);
+            }
+          }
+        } else {
+          // No tool calls - final response
+          const assistantText = message.content || '(No response)';
+          conversationHistory.push({ role: 'assistant', content: assistantText });
+          removeTypingIndicator();
+          addMessage('assistant', assistantText);
+          saveChatHistory();
+          break;
+        }
+      }
+
+      if (iteration >= maxIterations) {
+        removeTypingIndicator();
+        addMessage('error', 'Maximum tool call iterations reached.');
+      }
+
+    } catch (e) {
+      removeTypingIndicator();
+      addMessage('error', `Error: ${e.message}`);
+    } finally {
+      sendBtn.disabled = false;
+      userInput.disabled = false;
+      userInput.focus();
+    }
+  }
+
+  // ─── Event Listeners ────────────────────────────────────────────────
+  sendBtn.addEventListener('click', () => {
+    handleUserMessage(userInput.value);
+    userInput.value = '';
+  });
+
+  userInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendBtn.click();
+    }
+  });
+
+  saveConfigBtn.addEventListener('click', saveConfig);
+
+  resetDbBtn.addEventListener('click', () => {
+    if (confirm('This will delete all data. Are you sure?')) {
+      localStorage.removeItem(LS_KEY_DB);
+      localStorage.removeItem(LS_KEY_CHAT);
+      conversationHistory = [];
+      chatContainer.innerHTML = '';
+      initDatabase().then(() => {
+        addMessage('system', 'Database reset. All data cleared.');
+      });
+    }
+  });
+
+  configToggle.addEventListener('click', () => {
+    configPanel.style.display = configPanel.style.display === 'none' ? 'flex' : 'none';
+  });
+
+  // ─── Initialize ──────────────────────────────────────────────────────
+  loadConfig();
+  initDatabase().then(() => {
+    loadChatHistory();
+    if (conversationHistory.length === 0) {
+      addMessage('system', 'Meal Prep Chat ready. Configure your API settings above, then start chatting.');
+    }
+    userInput.focus();
+  });
+
+})();
+</script>
+</body>
+</html>
