@@ -259,6 +259,154 @@ body {
   75%  { content: '...'; }
   100% { content: ''; }
 }
+
+/* ─── History Sidebar ──────────────────────────────────────────────── */
+#history-toggle {
+  background: none;
+  border: 1px solid #333;
+  color: #888;
+  font-family: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+  font-size: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+  position: fixed;
+  top: 4px;
+  left: 8px;
+  z-index: 10;
+  border-radius: 6px;
+}
+
+#history-toggle:hover { color: #d4d4d4; }
+
+#history-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 280px;
+  height: 100vh;
+  background: #141414;
+  border-right: 1px solid #333;
+  z-index: 30;
+  display: none;
+  flex-direction: column;
+}
+
+#history-panel.open {
+  display: flex;
+}
+
+#history-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+#history-header span {
+  font-size: 13px;
+  color: #888;
+  font-weight: 500;
+}
+
+#new-chat-btn {
+  background: #1a1a1a;
+  border: 1px solid #444;
+  color: #7fdbca;
+  font-family: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+#new-chat-btn:hover {
+  background: #252525;
+  border-color: #7fdbca;
+}
+
+#history-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.history-item {
+  padding: 10px 12px;
+  border-bottom: 1px solid #1e1e1e;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-item:hover {
+  background: #1e1e1e;
+}
+
+.history-item.active {
+  background: #1a2520;
+  border-left: 2px solid #7fdbca;
+}
+
+.history-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-item-title {
+  font-size: 13px;
+  color: #c5c8c6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-item-date {
+  font-size: 11px;
+  color: #555;
+  margin-top: 2px;
+}
+
+.history-item-delete {
+  background: none;
+  border: none;
+  color: #555;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.history-item-delete:hover {
+  color: #cc6666;
+}
+
+.history-empty {
+  padding: 20px 12px;
+  color: #444;
+  font-size: 12px;
+  text-align: center;
+  font-style: italic;
+}
+
+#history-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 25;
+  display: none;
+}
+
+#history-overlay.open {
+  display: block;
+}
 </style>
 </head>
 <body>
@@ -292,6 +440,16 @@ body {
   <button id="reset-db-btn">Reset DB</button>
 </div>
 <button id="config-toggle">cfg</button>
+<button id="history-toggle">chats</button>
+
+<div id="history-overlay"></div>
+<div id="history-panel">
+  <div id="history-header">
+    <span>Conversations</span>
+    <button id="new-chat-btn">+ New</button>
+  </div>
+  <div id="history-list"></div>
+</div>
 
 <div id="chat-container"></div>
 
@@ -309,6 +467,7 @@ body {
   const LS_KEY_DB = 'mealprep_db';
   const LS_KEY_CONFIG = 'mealprep_config';
   const LS_KEY_CHAT = 'mealprep_chat';
+  const LS_KEY_CONVERSATIONS = 'mealprep_conversations';
 
   // ─── Schema ──────────────────────────────────────────────────────────
   const SCHEMA_SQL = `
@@ -498,6 +657,8 @@ Be concise and helpful. When the user's request is ambiguous, ask clarifying que
   // ─── State ───────────────────────────────────────────────────────────
   let db = null;
   let conversationHistory = [];
+  let conversations = [];
+  let activeConversationId = null;
 
   // ─── DOM Elements ────────────────────────────────────────────────────
   const chatContainer = document.getElementById('chat-container');
@@ -511,6 +672,11 @@ Be concise and helpful. When the user's request is ambiguous, ask clarifying que
   const apiProviderSelect = document.getElementById('api-provider');
   const saveConfigBtn = document.getElementById('save-config-btn');
   const resetDbBtn = document.getElementById('reset-db-btn');
+  const historyToggle = document.getElementById('history-toggle');
+  const historyPanel = document.getElementById('history-panel');
+  const historyOverlay = document.getElementById('history-overlay');
+  const newChatBtn = document.getElementById('new-chat-btn');
+  const historyList = document.getElementById('history-list');
 
   const API_PROVIDERS = {
     openai:     { url: 'https://api.openai.com/v1',            model: 'gpt-4o' },
@@ -685,35 +851,238 @@ Be concise and helpful. When the user's request is ambiguous, ask clarifying que
     if (el) el.remove();
   }
 
-  function loadChatHistory() {
+  // ─── Conversation Management ────────────────────────────────────────
+  function generateConversationId() {
+    return 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+  }
+
+  function getConversationTitle(messages) {
+    const firstUserMsg = messages.find(m => m.role === 'user');
+    if (firstUserMsg) {
+      const text = firstUserMsg.content.trim();
+      return text.length > 50 ? text.substring(0, 50) + '...' : text;
+    }
+    return 'New conversation';
+  }
+
+  function getTextMessages() {
+    return conversationHistory.filter(m =>
+      (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string'
+    );
+  }
+
+  function loadConversations() {
     try {
-      const saved = localStorage.getItem(LS_KEY_CHAT);
+      const saved = localStorage.getItem(LS_KEY_CONVERSATIONS);
       if (saved) {
-        conversationHistory = JSON.parse(saved);
-        for (const msg of conversationHistory) {
-          if (msg.role === 'user') {
-            addMessage('user', msg.content);
-          } else if (msg.role === 'assistant' && typeof msg.content === 'string') {
-            addMessage('assistant', msg.content);
+        conversations = JSON.parse(saved);
+      }
+
+      // Migrate from old single-chat format
+      if (conversations.length === 0) {
+        const oldChat = localStorage.getItem(LS_KEY_CHAT);
+        if (oldChat) {
+          const messages = JSON.parse(oldChat);
+          if (messages.length > 0) {
+            const conv = {
+              id: generateConversationId(),
+              title: getConversationTitle(messages),
+              createdAt: new Date().toISOString(),
+              messages: messages
+            };
+            conversations.push(conv);
+            activeConversationId = conv.id;
+            saveConversations();
           }
+          localStorage.removeItem(LS_KEY_CHAT);
         }
       }
     } catch (e) {
-      console.error('Failed to load chat history:', e);
-      conversationHistory = [];
+      console.error('Failed to load conversations:', e);
+      conversations = [];
     }
   }
 
-  function saveChatHistory() {
+  function saveConversations() {
     try {
-      // Only save the text messages, not tool call details
-      const toSave = conversationHistory.filter(m =>
-        (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string'
-      );
-      localStorage.setItem(LS_KEY_CHAT, JSON.stringify(toSave));
+      localStorage.setItem(LS_KEY_CONVERSATIONS, JSON.stringify(conversations));
     } catch (e) {
-      console.error('Failed to save chat history:', e);
+      console.error('Failed to save conversations:', e);
     }
+  }
+
+  function saveCurrentConversation() {
+    const textMessages = getTextMessages();
+    if (textMessages.length === 0) return;
+
+    if (activeConversationId) {
+      const idx = conversations.findIndex(c => c.id === activeConversationId);
+      if (idx >= 0) {
+        conversations[idx].messages = textMessages;
+        conversations[idx].title = getConversationTitle(textMessages);
+      } else {
+        conversations.unshift({
+          id: activeConversationId,
+          title: getConversationTitle(textMessages),
+          createdAt: new Date().toISOString(),
+          messages: textMessages
+        });
+      }
+    } else {
+      activeConversationId = generateConversationId();
+      conversations.unshift({
+        id: activeConversationId,
+        title: getConversationTitle(textMessages),
+        createdAt: new Date().toISOString(),
+        messages: textMessages
+      });
+    }
+    saveConversations();
+  }
+
+  function saveChatHistory() {
+    saveCurrentConversation();
+    renderConversationList();
+  }
+
+  function loadChatHistory() {
+    loadConversations();
+
+    if (activeConversationId) {
+      const conv = conversations.find(c => c.id === activeConversationId);
+      if (conv) {
+        conversationHistory = [...conv.messages];
+        renderMessages();
+      }
+    } else if (conversations.length > 0) {
+      // Load most recent conversation
+      activeConversationId = conversations[0].id;
+      conversationHistory = [...conversations[0].messages];
+      renderMessages();
+    }
+
+    renderConversationList();
+  }
+
+  function renderMessages() {
+    for (const msg of conversationHistory) {
+      if (msg.role === 'user') {
+        addMessage('user', msg.content);
+      } else if (msg.role === 'assistant' && typeof msg.content === 'string') {
+        addMessage('assistant', msg.content);
+      }
+    }
+  }
+
+  function startNewChat() {
+    saveCurrentConversation();
+
+    conversationHistory = [];
+    activeConversationId = generateConversationId();
+
+    chatContainer.innerHTML = '';
+    addMessage('system', 'New conversation started.');
+
+    renderConversationList();
+    closeHistoryPanel();
+    userInput.focus();
+  }
+
+  function switchToConversation(id) {
+    if (id === activeConversationId) {
+      closeHistoryPanel();
+      return;
+    }
+
+    saveCurrentConversation();
+
+    const conv = conversations.find(c => c.id === id);
+    if (!conv) return;
+
+    activeConversationId = id;
+    conversationHistory = [...conv.messages];
+
+    chatContainer.innerHTML = '';
+    renderMessages();
+
+    renderConversationList();
+    closeHistoryPanel();
+    userInput.focus();
+  }
+
+  function deleteConversation(id, event) {
+    event.stopPropagation();
+
+    const idx = conversations.findIndex(c => c.id === id);
+    if (idx < 0) return;
+
+    conversations.splice(idx, 1);
+    saveConversations();
+
+    if (id === activeConversationId) {
+      conversationHistory = [];
+      activeConversationId = generateConversationId();
+      chatContainer.innerHTML = '';
+      addMessage('system', 'Meal Prep Chat ready. Configure your API settings above, then start chatting.');
+    }
+
+    renderConversationList();
+  }
+
+  function renderConversationList() {
+    historyList.innerHTML = '';
+
+    for (const conv of conversations) {
+      const item = document.createElement('div');
+      item.className = 'history-item' + (conv.id === activeConversationId ? ' active' : '');
+
+      const info = document.createElement('div');
+      info.className = 'history-item-info';
+
+      const title = document.createElement('div');
+      title.className = 'history-item-title';
+      title.textContent = conv.title;
+
+      const date = document.createElement('div');
+      date.className = 'history-item-date';
+      date.textContent = new Date(conv.createdAt).toLocaleDateString();
+
+      info.appendChild(title);
+      info.appendChild(date);
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'history-item-delete';
+      deleteBtn.textContent = '\u00d7';
+      deleteBtn.addEventListener('click', (e) => deleteConversation(conv.id, e));
+
+      item.appendChild(info);
+      item.appendChild(deleteBtn);
+      item.addEventListener('click', () => switchToConversation(conv.id));
+
+      historyList.appendChild(item);
+    }
+
+    if (conversations.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'history-empty';
+      empty.textContent = 'No conversations yet';
+      historyList.appendChild(empty);
+    }
+  }
+
+  function toggleHistoryPanel() {
+    const isOpen = historyPanel.classList.contains('open');
+    if (isOpen) {
+      closeHistoryPanel();
+    } else {
+      historyPanel.classList.add('open');
+      historyOverlay.classList.add('open');
+    }
+  }
+
+  function closeHistoryPanel() {
+    historyPanel.classList.remove('open');
+    historyOverlay.classList.remove('open');
   }
 
   // ─── LLM Integration ────────────────────────────────────────────────
@@ -908,11 +1277,15 @@ Be concise and helpful. When the user's request is ambiguous, ask clarifying que
   saveConfigBtn.addEventListener('click', saveConfig);
 
   resetDbBtn.addEventListener('click', () => {
-    if (confirm('This will delete all data. Are you sure?')) {
+    if (confirm('This will delete all data and conversations. Are you sure?')) {
       localStorage.removeItem(LS_KEY_DB);
       localStorage.removeItem(LS_KEY_CHAT);
+      localStorage.removeItem(LS_KEY_CONVERSATIONS);
       conversationHistory = [];
+      conversations = [];
+      activeConversationId = generateConversationId();
       chatContainer.innerHTML = '';
+      renderConversationList();
       initDatabase().then(() => {
         addMessage('system', 'Database reset. All data cleared.');
       });
@@ -923,11 +1296,16 @@ Be concise and helpful. When the user's request is ambiguous, ask clarifying que
     configPanel.style.display = configPanel.style.display === 'none' ? 'flex' : 'none';
   });
 
+  historyToggle.addEventListener('click', toggleHistoryPanel);
+  historyOverlay.addEventListener('click', closeHistoryPanel);
+  newChatBtn.addEventListener('click', startNewChat);
+
   // ─── Initialize ──────────────────────────────────────────────────────
   loadConfig();
   initDatabase().then(() => {
     loadChatHistory();
     if (conversationHistory.length === 0) {
+      activeConversationId = generateConversationId();
       addMessage('system', 'Meal Prep Chat ready. Configure your API settings above, then start chatting.');
     }
     userInput.focus();
