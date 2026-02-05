@@ -315,6 +315,7 @@ body {
     CREATE TABLE IF NOT EXISTS recipes (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
+      type TEXT CHECK(type IN ('main','side')),
       servings INTEGER,
       yield_amount REAL,
       yield_unit TEXT,
@@ -407,8 +408,14 @@ body {
       week_id TEXT NOT NULL,
       day_of_week TEXT CHECK(day_of_week IN ('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')),
       meal_type TEXT CHECK(meal_type IN ('lunch','dinner')),
-      recipe_id TEXT,
-      FOREIGN KEY (week_id) REFERENCES weeks(id),
+      FOREIGN KEY (week_id) REFERENCES weeks(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS meal_plan_slot_recipes (
+      slot_id TEXT NOT NULL,
+      recipe_id TEXT NOT NULL,
+      PRIMARY KEY (slot_id, recipe_id),
+      FOREIGN KEY (slot_id) REFERENCES meal_plan_slots(id),
       FOREIGN KEY (recipe_id) REFERENCES recipes(id)
     );
   `;
@@ -419,7 +426,8 @@ body {
 DATABASE SCHEMA:
 ================
 
-recipes (id TEXT PK, name TEXT, servings INT, yield_amount REAL, yield_unit TEXT, frozen_shelf_life_days INT, fridge_shelf_life_days INT)
+recipes (id TEXT PK, name TEXT, type TEXT, servings INT, yield_amount REAL, yield_unit TEXT, frozen_shelf_life_days INT, fridge_shelf_life_days INT)
+  - type must be one of: main, side
 
 ingredients (id TEXT PK, name TEXT, quantity TEXT, unit TEXT, type TEXT)
   - type must be one of: Carne, Pollo, Pescado, Verduras, Frutas, Lacteos, Fiambres-Quesos, Secos-Enlatados, Condimentos, Otros
@@ -444,16 +452,20 @@ consumptions (id TEXT PK, batch_id TEXT FK->batches, servings_consumed INT, cons
 
 weeks (id TEXT PK, start_date TEXT, notes TEXT)
 
-meal_plan_slots (id TEXT PK, week_id TEXT FK->weeks, day_of_week TEXT, meal_type TEXT, recipe_id TEXT FK->recipes)
+meal_plan_slots (id TEXT PK, week_id TEXT FK->weeks, day_of_week TEXT, meal_type TEXT)
   - day_of_week: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday
   - meal_type: lunch, dinner
 
+meal_plan_slot_recipes (slot_id TEXT FK->meal_plan_slots, recipe_id TEXT FK->recipes) - composite PK
+  - Links recipes to meal plan slots (each slot can have multiple recipes, e.g. a main dish + a side dish)
+
 RELATIONSHIPS:
-- A recipe has many steps, each step can use ingredients and resources
+- A recipe has a type (main or side dish), many steps, and each step can use ingredients and resources
 - Steps can depend on other steps (step_dependencies)
 - Meal prep sessions produce batches of recipes
 - Batches are consumed over time (consumptions)
 - Weeks contain meal plan slots that assign recipes to specific days and meals
+- Each meal plan slot can have multiple recipes (via meal_plan_slot_recipes), e.g. a main dish and a side dish
 
 GUIDELINES:
 - Generate IDs using descriptive prefixes with incrementing numbers. Before inserting, query for existing IDs with that prefix to find the next number. Examples: recipe_1, ingredient_5, step_3, batch_12
@@ -476,9 +488,10 @@ COMMON QUERY PATTERNS:
    HAVING remaining > 0
 
 2. Recipes running low (planned but insufficient stock):
-   SELECT r.name, mps.day_of_week, mps.meal_type, COALESCE(stock.total_remaining, 0) as servings_available
+   SELECT r.name, r.type, mps.day_of_week, mps.meal_type, COALESCE(stock.total_remaining, 0) as servings_available
    FROM meal_plan_slots mps
-   JOIN recipes r ON mps.recipe_id = r.id
+   JOIN meal_plan_slot_recipes mpsr ON mpsr.slot_id = mps.id
+   JOIN recipes r ON mpsr.recipe_id = r.id
    LEFT JOIN (
      SELECT b.recipe_id, SUM(b.servings_produced - COALESCE(cons.consumed, 0)) as total_remaining
      FROM batches b
@@ -543,7 +556,40 @@ Be concise and helpful. When the user's request is ambiguous, ask clarifying que
     // Enable foreign keys and ensure schema exists
     db.run('PRAGMA foreign_keys = ON;');
     db.run(SCHEMA_SQL);
+    migrateDatabase();
     saveDatabase();
+  }
+
+  function migrateDatabase() {
+    // Migration: add 'type' column to recipes if missing
+    const recipeCols = db.exec("PRAGMA table_info(recipes)");
+    if (recipeCols.length > 0) {
+      const colNames = recipeCols[0].values.map(r => r[1]);
+      if (!colNames.includes('type')) {
+        db.run("ALTER TABLE recipes ADD COLUMN type TEXT CHECK(type IN ('main','side'))");
+      }
+    }
+
+    // Migration: move recipe_id from meal_plan_slots into meal_plan_slot_recipes
+    const slotCols = db.exec("PRAGMA table_info(meal_plan_slots)");
+    if (slotCols.length > 0) {
+      const colNames = slotCols[0].values.map(r => r[1]);
+      if (colNames.includes('recipe_id')) {
+        // Ensure junction table exists
+        db.run(`CREATE TABLE IF NOT EXISTS meal_plan_slot_recipes (
+          slot_id TEXT NOT NULL,
+          recipe_id TEXT NOT NULL,
+          PRIMARY KEY (slot_id, recipe_id),
+          FOREIGN KEY (slot_id) REFERENCES meal_plan_slots(id),
+          FOREIGN KEY (recipe_id) REFERENCES recipes(id)
+        )`);
+        // Migrate existing assignments
+        db.run(`INSERT OR IGNORE INTO meal_plan_slot_recipes (slot_id, recipe_id)
+          SELECT id, recipe_id FROM meal_plan_slots WHERE recipe_id IS NOT NULL`);
+        // Drop recipe_id column
+        db.run("ALTER TABLE meal_plan_slots DROP COLUMN recipe_id");
+      }
+    }
   }
 
   function saveDatabase() {
