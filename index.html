@@ -437,6 +437,9 @@ body {
     <input type="password" id="api-key" placeholder="sk-...">
   </div>
   <button id="save-config-btn">Save</button>
+  <button id="download-db-btn">Download DB</button>
+  <button id="upload-db-btn">Upload DB</button>
+  <input type="file" id="upload-db-input" accept=".db,.sqlite,.sqlite3" style="display:none">
   <button id="reset-db-btn">Reset DB</button>
 </div>
 <button id="config-toggle">cfg</button>
@@ -684,6 +687,9 @@ Be concise and helpful. When the user's request is ambiguous, ask clarifying que
   const apiKeyInput = document.getElementById('api-key');
   const apiProviderSelect = document.getElementById('api-provider');
   const saveConfigBtn = document.getElementById('save-config-btn');
+  const downloadDbBtn = document.getElementById('download-db-btn');
+  const uploadDbBtn = document.getElementById('upload-db-btn');
+  const uploadDbInput = document.getElementById('upload-db-input');
   const resetDbBtn = document.getElementById('reset-db-btn');
   const historyToggle = document.getElementById('history-toggle');
   const historyPanel = document.getElementById('history-panel');
@@ -771,6 +777,48 @@ Be concise and helpful. When the user's request is ambiguous, ask clarifying que
       localStorage.setItem(LS_KEY_DB, b64);
     } catch (e) {
       console.error('Failed to save database:', e);
+    }
+  }
+
+  function downloadDatabase() {
+    if (!db) return;
+    try {
+      const data = db.export();
+      const blob = new Blob([data], { type: 'application/x-sqlite3' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'mealprep.db';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addMessage('system', 'Database downloaded.');
+    } catch (e) {
+      console.error('Failed to download database:', e);
+      addMessage('error', 'Failed to download database: ' + e.message);
+    }
+  }
+
+  async function uploadDatabase(file) {
+    if (!file) return;
+    try {
+      const SQL = await initSqlJs({
+        locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${f}`
+      });
+      const buffer = await file.arrayBuffer();
+      const newDb = new SQL.Database(new Uint8Array(buffer));
+      // Validate by running a simple query
+      newDb.exec('SELECT count(*) FROM sqlite_master');
+      db = newDb;
+      db.run('PRAGMA foreign_keys = ON;');
+      db.run(SCHEMA_SQL);
+      migrateDatabase();
+      saveDatabase();
+      addMessage('system', 'Database uploaded and loaded successfully.');
+    } catch (e) {
+      console.error('Failed to upload database:', e);
+      addMessage('error', 'Failed to upload database: ' + e.message);
     }
   }
 
@@ -1321,6 +1369,22 @@ Be concise and helpful. When the user's request is ambiguous, ask clarifying que
   });
 
   saveConfigBtn.addEventListener('click', saveConfig);
+
+  downloadDbBtn.addEventListener('click', downloadDatabase);
+
+  uploadDbBtn.addEventListener('click', () => {
+    uploadDbInput.click();
+  });
+
+  uploadDbInput.addEventListener('change', () => {
+    const file = uploadDbInput.files[0];
+    if (file) {
+      if (confirm('This will replace the current database. Are you sure?')) {
+        uploadDatabase(file);
+      }
+      uploadDbInput.value = '';
+    }
+  });
 
   resetDbBtn.addEventListener('click', () => {
     if (confirm('This will delete all data and conversations. Are you sure?')) {
