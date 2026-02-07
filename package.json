@@ -1,0 +1,45 @@
+{
+  "name": "meal-prep-chat",
+  "version": "1.0.0",
+  "description": "Meal prep chat application with LLM integration",
+  "main": "dist/server/index.js",
+  "scripts": {
+    "build": "npm run build:server && npm run build:client && npm run build:static",
+    "build:server": "tsc",
+    "build:client": "esbuild src/client/main.ts --bundle --minify --sourcemap --target=es2020 --outfile=dist/public/bundle.js",
+    "build:static": "mkdir -p dist/public && cp public/index.html public/styles.css dist/public/",
+    "start": "node dist/server/index.js",
+    "dev": "concurrently \"tsc --watch\" \"nodemon dist/server/index.js\" \"esbuild src/client/main.ts --bundle --sourcemap --target=es2020 --outfile=dist/public/bundle.js --watch\"",
+    "typecheck": "tsc --noEmit && tsc --project tsconfig.client.json --noEmit",
+    "lint": "eslint src/",
+    "format": "prettier --write \"src/**/*.ts\" \"public/**/*.{html,css}\""
+  },
+  "keywords": [
+    "meal-prep",
+    "chat",
+    "llm",
+    "sqlite"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^17.2.4",
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.2.1",
+    "concurrently": "^9.2.1",
+    "esbuild": "^0.27.3",
+    "eslint": "^9.39.2",
+    "nodemon": "^3.0.1",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.54.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

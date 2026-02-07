@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es-AR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <title>Meal Prep</title>
+  </head>
+  <body>
+    <div id="history-overlay"></div>
+
+    <div id="history-panel">
+      <div id="history-header">
+        <h3>Conversaciones</h3>
+        <button id="history-close">&times;</button>
+      </div>
+      <div id="history-list"></div>
+    </div>
+
+    <div id="toolbar">
+      <button id="history-toggle">&#9776; Historial</button>
+      <button id="new-chat-btn">Nuevo Chat</button>
+      <span style="color: #666; font-size: 12px; margin-left: auto">Meal Prep</span>
+      <div id="config-panel" class="hidden">
+        <button id="download-sql-btn">Descargar SQL</button>
+        <button id="reset-db-btn">Resetear DB</button>
+      </div>
+      <button id="config-toggle">&#9881;</button>
+    </div>
+
+    <div id="chat-container"></div>
+
+    <div id="input-area">
+      <textarea id="user-input" placeholder="Escribi un mensaje..." rows="1"></textarea>
+      <button id="send-btn">Enviar</button>
+    </div>
+
+    <script src="bundle.js"></script>
+  </body>
+</html>
