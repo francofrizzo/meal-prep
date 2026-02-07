@@ -18,7 +18,7 @@ const INGREDIENT_TYPES = [
 export function registerIngredientTools(server: McpServer): void {
   server.tool(
     "manage_ingredients",
-    "Create, update, or delete ingredients used in recipes. Deleting an ingredient also removes all step_ingredients references to it.",
+    "Create, update, or delete ingredients used in recipes. Deleting an ingredient also removes all step_ingredients references to it. IMPORTANT: Before creating a new ingredient, search existing ingredients for similar names (singular/plural variants, abbreviations, synonyms). For example, check for 'Huevos' before adding 'Huevo', or 'Cebolla' before adding 'Cebollas'. Reuse the existing ingredient instead of creating a duplicate.",
     {
       action: z
         .enum(["create", "update", "delete"])

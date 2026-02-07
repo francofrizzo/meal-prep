@@ -55,8 +55,18 @@ export function registerStepTools(server: McpServer): void {
         .array(
           z.object({
             ingredient_id: z.string(),
-            quantity: z.string().optional(),
-            unit: z.string().optional(),
+            quantity: z
+              .string()
+              .optional()
+              .describe(
+                "Numeric amount as string, or null for descriptive units like 'a gusto'",
+              ),
+            unit: z
+              .string()
+              .optional()
+              .describe(
+                "Standardized unit. Weight: g, kg. Volume: ml. Spoons: cda (cucharada), cdta (cucharadita). Countable: unidad, feta, diente, hoja, lata, atado, paquete. Descriptive (quantity=null): a gusto, cantidad necesaria, opcional, un puñado, 1 pizca.",
+              ),
           }),
         )
         .optional()

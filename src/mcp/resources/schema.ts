@@ -5,11 +5,11 @@ export function registerSchemaResource(server: McpServer): void {
   server.resource(
     "schema",
     "mealprep://schema",
-    { description: "Complete database schema for all meal-prep tables (excludes conversations)" },
+    { description: "Complete database schema for all meal-prep tables and views (excludes conversations)" },
     async (uri) => {
       const tables = db
         .prepare(
-          "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'conversations' ORDER BY name",
+          "SELECT name, sql FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' AND name != 'conversations' ORDER BY type, name",
         )
         .all() as { name: string; sql: string }[];
 

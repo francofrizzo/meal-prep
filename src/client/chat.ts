@@ -27,10 +27,16 @@ weeks (id TEXT PK, start_date, notes)
 meal_plan_slots (id TEXT PK, week_id FK, day_of_week ['Monday'..'Sunday'], meal_type ['lunch'|'dinner'])
 meal_plan_slot_recipes (slot_id FK, recipe_id FK) — composite PK, allows multiple recipes per slot
 
+VIEWS (precomputed, use these instead of manual joins):
+batch_stock (batch_id, recipe_id, recipe_name, recipe_type, session_id, prep_date, servings_produced, servings_consumed, servings_remaining, fridge_expiry, freezer_expiry)
+recipe_stock (recipe_id, recipe_name, recipe_type, total_servings_remaining, oldest_batch_date, newest_batch_date, batch_count) — only batches with servings_remaining > 0
+
 CONVENTIONS:
 - IDs: prefix_N format (recipe_1, batch_12). Query existing IDs to find next number.
 - Dates: ISO 8601 (YYYY-MM-DD)
-- Stock calculation: servings_produced - SUM(servings_consumed)
+- Stock: use the batch_stock and recipe_stock views instead of computing manually
+- Ingredients: before creating a new ingredient, query existing ones for similar names (singular/plural, abbreviations, synonyms). E.g. check for 'Huevos' before adding 'Huevo', or 'Cebolla' before adding 'Cebollas'. Reuse the existing ingredient.
+- Units: use standardized symbols. Weight: g, kg. Volume: ml. Spoons: cda (cucharada), cdta (cucharadita). Countable: unidad, feta, diente, hoja, lata, atado, paquete. Descriptive (quantity=null): a gusto, cantidad necesaria, opcional, un puñado, 1 pizca. When there's a numeric amount, put the number in quantity and the unit symbol in unit (e.g. quantity="220", unit="g"). For descriptive amounts, set quantity=null and put the description in unit.
 
 KEY BEHAVIORS:
 - Use markdown tables for lists, meal plans (week grid), inventory, shopping lists
