@@ -24,8 +24,7 @@ function renderMarkdown(text: string): HTMLElement {
     return wrap;
   } catch {
     const span = document.createElement("span");
-    span.className = "message-body";
-    span.style.whiteSpace = "pre-wrap";
+    span.className = "message-body whitespace-pre-wrap";
     span.textContent = text;
     return span;
   }
@@ -33,12 +32,26 @@ function renderMarkdown(text: string): HTMLElement {
 
 export function addMessage(role: string, content: string): HTMLElement {
   const msgDiv = document.createElement("div");
-  msgDiv.className = `message message-${role}`;
+
+  if (role === "user") {
+    msgDiv.className =
+      "message-user self-end max-w-[90%] px-3 py-2 rounded text-sm whitespace-pre-wrap break-words text-term-user bg-term-user/5 border border-term-user/10";
+  } else if (role === "assistant") {
+    msgDiv.className =
+      "self-start max-w-[90%] px-3 py-2 rounded text-sm break-words text-term-text bg-term-surface border border-term-border";
+  } else if (role === "system") {
+    msgDiv.className =
+      "self-center text-term-text-muted text-xs italic py-1";
+  } else if (role === "error") {
+    msgDiv.className =
+      "self-center text-term-error text-xs py-1";
+  }
+
   if (role === "assistant" && content) {
     msgDiv.appendChild(renderMarkdown(content));
   } else {
     const span = document.createElement("span");
-    span.style.whiteSpace = "pre-wrap";
+    span.className = "whitespace-pre-wrap";
     span.textContent = content;
     msgDiv.appendChild(span);
   }
@@ -49,7 +62,8 @@ export function addMessage(role: string, content: string): HTMLElement {
 
 export function addTypingIndicator(): HTMLElement {
   const typingDiv = document.createElement("div");
-  typingDiv.className = "message message-assistant";
+  typingDiv.className =
+    "typing-cursor self-start text-term-text-dim text-sm px-3 py-2";
   typingDiv.textContent = "...";
   typingDiv.id = "typing-indicator";
   chatContainer.appendChild(typingDiv);
@@ -74,17 +88,18 @@ export function removeQueriesAccordion(): void {
 export function addQueryToAccordion(query: string): void {
   if (!queriesAccordion) {
     queriesAccordion = document.createElement("div");
-    queriesAccordion.className = "queries-accordion";
+    queriesAccordion.className = "queries-accordion my-1 text-[11px]";
 
     const header = document.createElement("div");
-    header.className = "queries-header";
+    header.className =
+      "queries-header flex items-center gap-1.5 py-0.5 cursor-pointer text-term-text-muted hover:text-term-text-dim select-none";
     header.textContent = "queries ejecutadas";
     header.addEventListener("click", () => {
       queriesAccordion!.classList.toggle("open");
     });
 
     const content = document.createElement("div");
-    content.className = "queries-content";
+    content.className = "queries-content pl-3 pt-1";
 
     queriesAccordion.appendChild(header);
     queriesAccordion.appendChild(content);
@@ -93,7 +108,8 @@ export function addQueryToAccordion(query: string): void {
   }
 
   const queryItem = document.createElement("div");
-  queryItem.className = "query-item";
+  queryItem.className =
+    "my-0.5 px-2 py-1 bg-term-bg rounded text-[11px] whitespace-pre-wrap break-all text-term-accent-dim font-mono border border-term-border";
   queryItem.textContent = query;
 
   const content = queriesAccordion.querySelector(".queries-content")!;
@@ -117,27 +133,30 @@ export function renderHistoryPanel(
 
   for (const conv of conversations) {
     const item = document.createElement("div");
-    item.className = "history-item";
+    item.className =
+      "flex justify-between items-start gap-2 px-3 py-2.5 rounded cursor-pointer hover:bg-term-raised transition-colors";
     if (conv.id === activeConversationId) {
-      item.classList.add("active");
+      item.className += " bg-term-raised border-l-2 border-term-accent";
     }
 
     const info = document.createElement("div");
-    info.className = "history-item-info";
+    info.className = "flex-1 min-w-0";
 
     const title = document.createElement("div");
-    title.className = "history-item-title";
+    title.className =
+      "text-xs text-term-text truncate";
     title.textContent = conv.title || "Sin titulo";
 
     const date = document.createElement("div");
-    date.className = "history-item-date";
+    date.className = "text-[11px] text-term-text-muted mt-0.5";
     date.textContent = formatDate(conv.updated_at);
 
     info.appendChild(title);
     info.appendChild(date);
 
     const deleteBtn = document.createElement("button");
-    deleteBtn.className = "history-item-delete";
+    deleteBtn.className =
+      "text-term-text-muted hover:text-term-error text-base leading-none cursor-pointer shrink-0";
     deleteBtn.textContent = "\u00D7";
     deleteBtn.addEventListener("click", (e) => onDelete(conv.id, e as MouseEvent));
 
@@ -150,7 +169,7 @@ export function renderHistoryPanel(
 
   if (conversations.length === 0) {
     const empty = document.createElement("div");
-    empty.className = "history-empty";
+    empty.className = "px-6 py-8 text-center text-term-text-muted text-xs";
     empty.textContent = "No hay conversaciones";
     historyList.appendChild(empty);
   }
@@ -179,7 +198,7 @@ export function toggleHistoryPanel(): void {
     closeHistoryPanel();
   } else {
     historyPanel.classList.add("open");
-    historyOverlay.classList.add("open");
+    historyOverlay.classList.remove("hidden");
   }
 }
 
@@ -187,5 +206,5 @@ export function closeHistoryPanel(): void {
   const historyPanel = document.getElementById("history-panel")!;
   const historyOverlay = document.getElementById("history-overlay")!;
   historyPanel.classList.remove("open");
-  historyOverlay.classList.remove("open");
+  historyOverlay.classList.add("hidden");
 }

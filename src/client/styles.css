@@ -1,0 +1,297 @@
+@import "tailwindcss";
+
+@source "../../public/index.html";
+
+@theme {
+  --color-term-bg: #08090a;
+  --color-term-surface: #101214;
+  --color-term-raised: #181a1e;
+  --color-term-border: #232730;
+  --color-term-border-bright: #3a3f4b;
+  --color-term-text: #b8bfc6;
+  --color-term-text-dim: #5c6370;
+  --color-term-text-muted: #3b4048;
+  --color-term-accent: #5af5c4;
+  --color-term-accent-dim: #2a7a62;
+  --color-term-error: #e06c75;
+  --color-term-user: #c4a7e7;
+  --font-mono: "IBM Plex Mono", "Menlo", monospace;
+}
+
+/* ─── Base ─────────────────────────────────────────────────────────── */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-mono);
+  background: var(--color-term-bg);
+  color: var(--color-term-text);
+}
+
+/* Subtle scanline overlay on the whole page */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+}
+
+/* ─── Scrollbars ───────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-term-border);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-term-border-bright);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-term-border) transparent;
+}
+
+/* ─── User message prompt character ───────────────────────────────── */
+
+.message-user::before {
+  content: "❯ ";
+  color: var(--color-term-user);
+  opacity: 0.4;
+  font-weight: 600;
+}
+
+/* ─── Typing indicator ─────────────────────────────────────────────── */
+
+.typing-cursor::after {
+  content: "█";
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ─── Queries accordion ────────────────────────────────────────────── */
+
+.queries-header::before {
+  content: "▸";
+  font-size: 10px;
+  transition: transform 0.15s ease;
+  display: inline-block;
+}
+
+.queries-accordion.open .queries-header::before {
+  transform: rotate(90deg);
+}
+
+.queries-accordion .queries-content {
+  display: none;
+}
+
+.queries-accordion.open .queries-content {
+  display: block;
+}
+
+/* ─── Markdown message content ─────────────────────────────────────── */
+
+.message-body {
+  line-height: 1.45;
+}
+
+.message-body p {
+  margin: 0 0 0.3em 0;
+}
+
+.message-body > *:last-child,
+.message-body > *:last-child p:last-child {
+  margin-bottom: 0;
+}
+
+.message-body p:has(+ ul),
+.message-body p:has(+ ol) {
+  margin-bottom: 0;
+}
+
+.message-body h1,
+.message-body h2,
+.message-body h3 {
+  margin: 0.5em 0 0.15em 0;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--color-term-accent);
+}
+
+.message-body h1 {
+  font-size: 1.05em;
+}
+
+.message-body h2 {
+  font-size: 1em;
+}
+
+.message-body h3 {
+  font-size: 0.95em;
+}
+
+.message-body h1:first-child,
+.message-body h2:first-child,
+.message-body h3:first-child {
+  margin-top: 0;
+}
+
+.message-body ul,
+.message-body ol {
+  margin: 0;
+  padding-left: 1.8em;
+  list-style-position: outside;
+}
+
+.message-body ul {
+  list-style-type: disc;
+}
+
+.message-body ol {
+  list-style-type: decimal;
+}
+
+.message-body li {
+  margin: 0;
+  padding: 0;
+}
+
+.message-body li p {
+  margin: 0 !important;
+}
+
+.message-body li > p:first-child {
+  display: inline;
+}
+
+.message-body li ul,
+.message-body li ol {
+  margin: 0.1em 0 0 0;
+}
+
+.message-body ol + p,
+.message-body ul + p {
+  margin-top: 0.2em;
+}
+
+.message-body code {
+  background: var(--color-term-raised);
+  border: 1px solid var(--color-term-border);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  font-size: 0.9em;
+  color: var(--color-term-accent);
+}
+
+.message-body pre {
+  background: var(--color-term-bg);
+  border: 1px solid var(--color-term-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin: 0.4em 0;
+  overflow-x: auto;
+  font-size: 12px;
+}
+
+.message-body pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-term-text);
+}
+
+.message-body blockquote {
+  border-left: 2px solid var(--color-term-accent-dim);
+  margin: 0.4em 0;
+  padding-left: 1em;
+  color: var(--color-term-text-dim);
+}
+
+.message-body a {
+  color: var(--color-term-accent);
+  text-decoration: none;
+}
+
+.message-body a:hover {
+  text-decoration: underline;
+}
+
+.message-body strong {
+  font-weight: 600;
+  color: var(--color-term-text);
+}
+
+.message-body hr {
+  border: none;
+  border-top: 1px solid var(--color-term-border);
+  margin: 0.6em 0;
+}
+
+.message-body table {
+  border-collapse: collapse;
+  margin: 0.4em 0;
+  font-size: 0.88em;
+  width: 100%;
+}
+
+.message-body th,
+.message-body td {
+  border: 1px solid var(--color-term-border);
+  padding: 5px 10px;
+  text-align: left;
+}
+
+.message-body th {
+  background: var(--color-term-raised);
+  font-weight: 600;
+  color: var(--color-term-accent);
+  text-transform: uppercase;
+  font-size: 0.85em;
+  letter-spacing: 0.05em;
+}
+
+.message-body tr:nth-child(even) {
+  background: var(--color-term-surface);
+}
+
+/* ─── History panel slide transition ───────────────────────────────── */
+
+#history-panel {
+  transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#history-panel.open {
+  transform: translateX(0);
+}
+
+/* ─── Focus ring override ──────────────────────────────────────────── */
+
+textarea:focus,
+button:focus-visible {
+  outline: 1px solid var(--color-term-accent-dim);
+  outline-offset: -1px;
+}

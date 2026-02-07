@@ -12,29 +12,51 @@
     <link rel="stylesheet" href="styles.css" />
     <title>Meal Prep</title>
   </head>
-  <body>
-    <div id="history-overlay"></div>
+  <body class="h-screen flex flex-col overflow-hidden font-mono">
 
-    <div id="history-panel">
-      <div id="history-header">
-        <h3>Conversaciones</h3>
-        <button id="history-close">&times;</button>
+    <!-- History overlay -->
+    <div id="history-overlay" class="fixed inset-0 bg-black/50 z-40 hidden"></div>
+
+    <!-- History sidebar -->
+    <div id="history-panel" class="fixed top-0 left-0 w-72 h-screen bg-term-bg border-r border-term-border z-50 flex flex-col md:w-80">
+      <div id="history-header" class="flex items-center justify-between px-4 py-3 border-b border-term-border">
+        <h3 class="text-sm font-medium text-term-text">Conversaciones</h3>
+        <button id="history-close" class="text-term-text-dim hover:text-term-text text-lg leading-none cursor-pointer">&times;</button>
       </div>
-      <div id="history-list"></div>
+      <div id="history-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
     </div>
 
-    <div id="toolbar">
-      <button id="history-toggle">Historial</button>
-      <button id="new-chat-btn">Nuevo chat</button>
-      <span style="color: #666; font-size: 12px; margin-left: auto">Meal Prep</span>
-      <button id="download-sql-btn">Exportar SQL</button>
+    <!-- Toolbar -->
+    <div id="toolbar" class="relative flex items-center gap-2 px-4 py-2 bg-term-surface border-b border-term-border text-xs">
+      <button id="history-toggle" class="px-2.5 py-1 text-term-text-dim hover:text-term-accent border border-term-border rounded cursor-pointer transition-colors">
+        historial
+      </button>
+      <button id="new-chat-btn" class="px-2.5 py-1 text-term-accent-dim hover:text-term-accent border border-term-border rounded cursor-pointer transition-colors">
+        + nuevo
+      </button>
+      <span class="absolute left-1/2 -translate-x-1/2 text-term-text-muted tracking-widest uppercase text-[10px] pointer-events-none">meal prep</span>
+      <button id="download-sql-btn" class="ml-auto px-2.5 py-1 text-term-text-dim hover:text-term-text border border-term-border rounded cursor-pointer transition-colors">
+        exportar sql
+      </button>
     </div>
 
-    <div id="chat-container"></div>
+    <!-- Chat area -->
+    <div id="chat-container" class="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3"></div>
 
-    <div id="input-area">
-      <textarea id="user-input" placeholder="Escribí un mensaje..." rows="1"></textarea>
-      <button id="send-btn">Enviar</button>
+    <!-- Input area -->
+    <div id="input-area" class="flex gap-2 px-4 py-3 bg-term-surface border-t border-term-border">
+      <textarea
+        id="user-input"
+        class="flex-1 bg-term-bg border border-term-border text-term-text font-mono text-sm px-3 py-2 rounded resize-none min-h-5 max-h-28 overflow-y-auto placeholder:text-term-text-muted focus:border-term-accent-dim"
+        placeholder="Escribí un mensaje..."
+        rows="1"
+      ></textarea>
+      <button
+        id="send-btn"
+        class="px-4 py-2 bg-term-accent/10 border border-term-accent-dim text-term-accent text-sm rounded cursor-pointer hover:bg-term-accent/20 disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap transition-colors"
+      >
+        enviar
+      </button>
     </div>
 
     <script src="bundle.js"></script>

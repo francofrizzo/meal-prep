@@ -4,15 +4,16 @@
   "description": "Meal prep chat application with LLM integration",
   "main": "dist/server/index.js",
   "scripts": {
-    "build": "npm run build:server && npm run build:client && npm run build:static",
+    "build": "npm run build:server && npm run build:client && npm run build:css && npm run build:static",
     "build:server": "tsc",
     "build:client": "esbuild src/client/main.ts --bundle --minify --sourcemap --target=es2020 --outfile=dist/public/bundle.js",
-    "build:static": "mkdir -p dist/public && cp public/index.html public/styles.css dist/public/",
+    "build:css": "npx @tailwindcss/cli -i src/client/styles.css -o dist/public/styles.css --minify",
+    "build:static": "mkdir -p dist/public && cp public/index.html dist/public/",
     "start": "node dist/server/index.js",
-    "dev": "concurrently \"tsc --watch\" \"nodemon dist/server/index.js\" \"esbuild src/client/main.ts --bundle --sourcemap --target=es2020 --outfile=dist/public/bundle.js --watch\"",
+    "dev": "concurrently \"tsc --watch\" \"nodemon dist/server/index.js\" \"esbuild src/client/main.ts --bundle --sourcemap --target=es2020 --outfile=dist/public/bundle.js --watch\" \"npx @tailwindcss/cli -i src/client/styles.css -o dist/public/styles.css --watch\"",
     "typecheck": "tsc --noEmit && tsc --project tsconfig.client.json --noEmit",
     "lint": "eslint src/",
-    "format": "prettier --write \"src/**/*.ts\" \"public/**/*.{html,css}\""
+    "format": "prettier --write \"src/**/*.ts\" \"public/**/*.html\""
   },
   "keywords": [
     "meal-prep",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@tailwindcss/cli": "^4.1.18",
     "@types/dompurify": "^3.0.5",
     "@types/express": "^5.0.6",
     "@types/node": "^25.2.1",
@@ -39,6 +41,7 @@
     "eslint": "^9.39.2",
     "nodemon": "^3.0.1",
     "prettier": "^3.8.1",
+    "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.54.0"
   },
