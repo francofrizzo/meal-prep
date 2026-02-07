@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import path from "path";
-import { initSchema } from "./db";
+import { runMigrations } from "./db";
 import sqlRoutes from "./routes/sql";
 import chatRoutes from "./routes/chat";
 import conversationRoutes from "./routes/conversations";
@@ -22,7 +22,7 @@ const app = express();
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(__dirname, "..", "public")));
 
-initSchema();
+runMigrations();
 
 app.use("/api/sql", sqlRoutes);
 app.use("/api/chat", chatRoutes);

@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
+import migrations from "./migrations/index.js";
 
 const dbPath = process.env.DATABASE_PATH || "./data/mealprep.db";
 const dbDir = path.dirname(dbPath);
@@ -38,154 +39,40 @@ export function nextId(prefix: string, table: string): string {
   return `${prefix}_${(row.max_num ?? 0) + 1}`;
 }
 
-export function initSchema(): void {
+export function runMigrations(): void {
+  // Create migrations tracking table
   db.exec(`
-    CREATE TABLE IF NOT EXISTS recipes (
-      id TEXT PRIMARY KEY,
+    CREATE TABLE IF NOT EXISTS _migrations (
+      id INTEGER PRIMARY KEY,
       name TEXT NOT NULL,
-      type TEXT CHECK(type IN ('main','side','base')),
-      servings INTEGER,
-      yield_amount REAL,
-      yield_unit TEXT,
-      frozen_shelf_life_days INTEGER,
-      fridge_shelf_life_days INTEGER
+      applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
-
-    CREATE TABLE IF NOT EXISTS ingredients (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      type TEXT CHECK(type IN ('Meat','Poultry','Fish','Vegetables','Fruits','Dairy','Deli/Cheese','Pantry/Canned','Condiments','Other'))
-    );
-
-    CREATE TABLE IF NOT EXISTS steps (
-      id TEXT PRIMARY KEY,
-      recipe_id TEXT NOT NULL,
-      description TEXT NOT NULL,
-      phase TEXT CHECK(phase IN ('meal-prep','day-of-eating')),
-      order_num INTEGER,
-      duration_minutes INTEGER,
-      FOREIGN KEY (recipe_id) REFERENCES recipes(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS step_dependencies (
-      step_id TEXT NOT NULL,
-      depends_on_step_id TEXT NOT NULL,
-      PRIMARY KEY (step_id, depends_on_step_id),
-      FOREIGN KEY (step_id) REFERENCES steps(id),
-      FOREIGN KEY (depends_on_step_id) REFERENCES steps(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS step_ingredients (
-      step_id TEXT NOT NULL,
-      ingredient_id TEXT NOT NULL,
-      quantity TEXT,
-      unit TEXT,
-      PRIMARY KEY (step_id, ingredient_id),
-      FOREIGN KEY (step_id) REFERENCES steps(id),
-      FOREIGN KEY (ingredient_id) REFERENCES ingredients(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS resources (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      type TEXT CHECK(type IN ('oven','pan','pot','stove'))
-    );
-
-    CREATE TABLE IF NOT EXISTS step_resource_usage (
-      step_id TEXT NOT NULL,
-      resource_id TEXT NOT NULL,
-      temperature_celsius INTEGER,
-      notes TEXT,
-      PRIMARY KEY (step_id, resource_id),
-      FOREIGN KEY (step_id) REFERENCES steps(id),
-      FOREIGN KEY (resource_id) REFERENCES resources(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS meal_prep_sessions (
-      id TEXT PRIMARY KEY,
-      date TEXT NOT NULL,
-      notes TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS batches (
-      id TEXT PRIMARY KEY,
-      recipe_id TEXT NOT NULL,
-      session_id TEXT NOT NULL,
-      servings_produced INTEGER NOT NULL,
-      prep_date TEXT NOT NULL,
-      FOREIGN KEY (recipe_id) REFERENCES recipes(id),
-      FOREIGN KEY (session_id) REFERENCES meal_prep_sessions(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS consumptions (
-      id TEXT PRIMARY KEY,
-      batch_id TEXT NOT NULL,
-      servings_consumed INTEGER NOT NULL,
-      consumption_date TEXT NOT NULL,
-      FOREIGN KEY (batch_id) REFERENCES batches(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS weeks (
-      id TEXT PRIMARY KEY,
-      start_date TEXT NOT NULL,
-      notes TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS meal_plan_slots (
-      id TEXT PRIMARY KEY,
-      week_id TEXT NOT NULL,
-      day_of_week TEXT CHECK(day_of_week IN ('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')),
-      meal_type TEXT CHECK(meal_type IN ('lunch','dinner')),
-      FOREIGN KEY (week_id) REFERENCES weeks(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS meal_plan_slot_recipes (
-      slot_id TEXT NOT NULL,
-      recipe_id TEXT NOT NULL,
-      PRIMARY KEY (slot_id, recipe_id),
-      FOREIGN KEY (slot_id) REFERENCES meal_plan_slots(id),
-      FOREIGN KEY (recipe_id) REFERENCES recipes(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS conversations (
-      id TEXT PRIMARY KEY,
-      title TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      history TEXT NOT NULL
-    );
-
-    CREATE VIEW IF NOT EXISTS batch_stock AS
-    SELECT
-      b.id AS batch_id,
-      b.recipe_id,
-      r.name AS recipe_name,
-      r.type AS recipe_type,
-      b.session_id,
-      b.prep_date,
-      b.servings_produced,
-      COALESCE(SUM(c.servings_consumed), 0) AS servings_consumed,
-      b.servings_produced - COALESCE(SUM(c.servings_consumed), 0) AS servings_remaining,
-      DATE(b.prep_date, '+' || r.fridge_shelf_life_days || ' days') AS fridge_expiry,
-      DATE(b.prep_date, '+' || r.frozen_shelf_life_days || ' days') AS freezer_expiry
-    FROM batches b
-    JOIN recipes r ON r.id = b.recipe_id
-    LEFT JOIN consumptions c ON c.batch_id = b.id
-    GROUP BY b.id;
-
-    CREATE VIEW IF NOT EXISTS recipe_stock AS
-    SELECT
-      recipe_id,
-      recipe_name,
-      recipe_type,
-      SUM(servings_remaining) AS total_servings_remaining,
-      MIN(prep_date) AS oldest_batch_date,
-      MAX(prep_date) AS newest_batch_date,
-      COUNT(*) AS batch_count
-    FROM batch_stock
-    WHERE servings_remaining > 0
-    GROUP BY recipe_id;
   `);
+
+  // Get already-applied migrations
+  const applied = db
+    .prepare("SELECT id FROM _migrations")
+    .all() as { id: number }[];
+  const appliedIds = new Set(applied.map((r) => r.id));
+
+  // Migrations are imported at the top of the file
+
+  // Run pending migrations
+  for (const migration of migrations) {
+    if (appliedIds.has(migration.id)) {
+      continue;
+    }
+
+    const txn = db.transaction(() => {
+      db.exec(migration.sql);
+      db
+        .prepare("INSERT INTO _migrations (id, name) VALUES (?, ?)")
+        .run(migration.id, migration.name);
+    });
+
+    txn();
+    console.log(`Applied migration ${migration.id}: ${migration.name}`);
+  }
 }
 
 export { db };
