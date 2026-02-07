@@ -12,7 +12,7 @@ router.post("/", async (req: Request, res: Response) => {
     return;
   }
 
-  const statements = query.split(";").filter((s: string) => s.trim());
+  const statements = splitStatements(query);
   const results: SqlResult[] = [];
 
   for (const stmt of statements) {
@@ -37,5 +37,28 @@ router.post("/", async (req: Request, res: Response) => {
 
   res.json(results.length === 1 ? results[0] : results);
 });
+
+function splitStatements(sql: string): string[] {
+  const stmts: string[] = [];
+  let current = "";
+  let inSingle = false;
+  let inDouble = false;
+
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i];
+    if (ch === "'" && !inDouble) {
+      inSingle = !inSingle;
+    } else if (ch === '"' && !inSingle) {
+      inDouble = !inDouble;
+    } else if (ch === ";" && !inSingle && !inDouble) {
+      if (current.trim()) stmts.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim()) stmts.push(current.trim());
+  return stmts;
+}
 
 export default router;
