@@ -30,6 +30,12 @@ export function registerSessionTools(server: McpServer): void {
           "Session date in YYYY-MM-DD format (required for create_session)",
         ),
       notes: z.string().optional().describe("Session notes"),
+      gantt: z
+        .string()
+        .optional()
+        .describe(
+          "Gantt diagram for the session in .gantt format (plain text DSL). Sections: VERSION 1, START/END HH:MM, LANES (one per line, e.g. 'Persona: 2', 'Horno', 'Hornalla: 4', 'Sartén Essen', 'Cacerola' — lanes represent people, equipment, or appliances), TASKS (pipe-separated: Name | Duration | Lane(s) | Color | Dependencies | @Start). Duration: 15m, 1h, 1h30m. Dependencies: 'after Task A, Task B'. Pinned time: '@09:30'. Lane specifiers: 'Persona' or 'Horno' (any available), 'Persona#1' or 'Hornalla#2' (specific sub-lane), 'Persona*2' (multiple simultaneously), 'Persona(P)' or 'Horno(P)' (passive, doesn't block).",
+        ),
       session_id: z
         .string()
         .optional()
@@ -66,8 +72,8 @@ export function registerSessionTools(server: McpServer): void {
               };
             const newId = nextId("session", "meal_prep_sessions");
             db.prepare(
-              "INSERT INTO meal_prep_sessions (id, date, notes) VALUES (?, ?, ?)",
-            ).run(newId, args.date, args.notes ?? null);
+              "INSERT INTO meal_prep_sessions (id, date, notes, gantt) VALUES (?, ?, ?, ?)",
+            ).run(newId, args.date, args.notes ?? null, args.gantt ?? null);
             return {
               content: [
                 {
@@ -76,6 +82,7 @@ export function registerSessionTools(server: McpServer): void {
                     id: newId,
                     date: args.date,
                     notes: args.notes,
+                    gantt: args.gantt,
                   }),
                 },
               ],
@@ -101,6 +108,10 @@ export function registerSessionTools(server: McpServer): void {
             if (args.notes !== undefined) {
               fields.push("notes = ?");
               values.push(args.notes);
+            }
+            if (args.gantt !== undefined) {
+              fields.push("gantt = ?");
+              values.push(args.gantt);
             }
             if (fields.length === 0)
               return {
