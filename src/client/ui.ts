@@ -78,7 +78,7 @@ export function addQueryToAccordion(query: string): void {
 
     const header = document.createElement("div");
     header.className = "queries-header";
-    header.textContent = "Consultas SQL";
+    header.textContent = "queries ejecutadas";
     header.addEventListener("click", () => {
       queriesAccordion!.classList.toggle("open");
     });
