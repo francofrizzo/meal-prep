@@ -4,7 +4,7 @@ import { SqlResult } from "../types";
 
 const router = Router();
 
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", (req: Request, res: Response) => {
   const { query } = req.body as { query?: string };
 
   if (!query) {
@@ -23,11 +23,11 @@ router.post("/", async (req: Request, res: Response) => {
 
     try {
       if (isSelect) {
-        const rows = await dbAll(trimmed);
+        const rows = dbAll(trimmed);
         results.push({ rows, changes: 0 });
       } else {
-        const result = await dbRun(trimmed);
-        results.push({ changes: result.changes, lastID: result.lastID });
+        const result = dbRun(trimmed);
+        results.push({ changes: result.changes, lastID: result.lastInsertRowid as number });
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";

@@ -4,19 +4,19 @@ import { TableSchema, TableName } from "../types";
 
 const router = Router();
 
-router.get("/sql", async (_req: Request, res: Response) => {
+router.get("/sql", (_req: Request, res: Response) => {
   try {
     const dump: string[] = [];
 
-    const tables = await dbAll<TableSchema>(
+    const tables = dbAll<TableSchema>(
       "SELECT sql FROM sqlite_master WHERE type='table' AND sql IS NOT NULL",
     );
     tables.forEach((t) => dump.push(t.sql + ";"));
 
-    const tableNames = await dbAll<TableName>("SELECT name FROM sqlite_master WHERE type='table'");
+    const tableNames = dbAll<TableName>("SELECT name FROM sqlite_master WHERE type='table'");
 
     for (const { name } of tableNames) {
-      const rows = await dbAll<Record<string, unknown>>(`SELECT * FROM ${name}`);
+      const rows = dbAll<Record<string, unknown>>(`SELECT * FROM ${name}`);
       rows.forEach((row) => {
         const cols = Object.keys(row);
         const vals = cols.map((c) => {

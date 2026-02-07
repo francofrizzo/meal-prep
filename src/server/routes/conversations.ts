@@ -4,9 +4,9 @@ import { ConversationRow } from "../types";
 
 const router = Router();
 
-router.get("/", async (_req: Request, res: Response) => {
+router.get("/", (_req: Request, res: Response) => {
   try {
-    const rows = await dbAll<Omit<ConversationRow, "history">>(
+    const rows = dbAll<Omit<ConversationRow, "history">>(
       "SELECT id, title, created_at, updated_at FROM conversations ORDER BY updated_at DESC",
     );
     res.json(rows);
@@ -16,7 +16,7 @@ router.get("/", async (_req: Request, res: Response) => {
   }
 });
 
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", (req: Request, res: Response) => {
   const { id, title, history } = req.body as {
     id: string;
     title: string;
@@ -24,7 +24,7 @@ router.post("/", async (req: Request, res: Response) => {
   };
 
   try {
-    await dbRun(
+    dbRun(
       "INSERT OR REPLACE INTO conversations (id, title, history, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
       [id, title, JSON.stringify(history)],
     );
@@ -35,9 +35,9 @@ router.post("/", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/:id", async (req: Request, res: Response) => {
+router.get("/:id", (req: Request, res: Response) => {
   try {
-    const row = await dbGet<ConversationRow>("SELECT * FROM conversations WHERE id = ?", [
+    const row = dbGet<ConversationRow>("SELECT * FROM conversations WHERE id = ?", [
       req.params.id,
     ]);
     if (!row) {
@@ -51,9 +51,9 @@ router.get("/:id", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/:id", async (req: Request, res: Response) => {
+router.delete("/:id", (req: Request, res: Response) => {
   try {
-    const result = await dbRun("DELETE FROM conversations WHERE id = ?", [req.params.id]);
+    const result = dbRun("DELETE FROM conversations WHERE id = ?", [req.params.id]);
     res.json({ deleted: result.changes > 0 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
