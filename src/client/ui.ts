@@ -1,11 +1,47 @@
+import { marked } from "marked";
+import DOMPurify from "dompurify";
+
 const chatContainer = document.getElementById("chat-container")!;
 
 let queriesAccordion: HTMLElement | null = null;
 
+const ALLOWED_TAGS = [
+  "p", "br", "strong", "em", "a", "ul", "ol", "li",
+  "h1", "h2", "h3", "h4", "code", "pre", "blockquote", "hr",
+  "table", "thead", "tbody", "tr", "th", "td",
+];
+
+function renderMarkdown(text: string): HTMLElement {
+  try {
+    const rawHtml = marked.parse(text, { gfm: true, breaks: false }) as string;
+    const safeHtml = DOMPurify.sanitize(rawHtml, {
+      ALLOWED_TAGS,
+      ALLOWED_ATTR: ["href", "target"],
+    });
+    const wrap = document.createElement("div");
+    wrap.className = "message-body";
+    wrap.innerHTML = safeHtml;
+    return wrap;
+  } catch {
+    const span = document.createElement("span");
+    span.className = "message-body";
+    span.style.whiteSpace = "pre-wrap";
+    span.textContent = text;
+    return span;
+  }
+}
+
 export function addMessage(role: string, content: string): HTMLElement {
   const msgDiv = document.createElement("div");
   msgDiv.className = `message message-${role}`;
-  msgDiv.textContent = content;
+  if (role === "assistant" && content) {
+    msgDiv.appendChild(renderMarkdown(content));
+  } else {
+    const span = document.createElement("span");
+    span.style.whiteSpace = "pre-wrap";
+    span.textContent = content;
+    msgDiv.appendChild(span);
+  }
   chatContainer.appendChild(msgDiv);
   chatContainer.scrollTop = chatContainer.scrollHeight;
   return msgDiv;

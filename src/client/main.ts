@@ -10,16 +10,13 @@ import {
 
 const userInput = document.getElementById("user-input") as HTMLTextAreaElement;
 const sendBtn = document.getElementById("send-btn") as HTMLButtonElement;
-const configPanel = document.getElementById("config-panel")!;
-const configToggle = document.getElementById("config-toggle")!;
 const downloadSqlBtn = document.getElementById("download-sql-btn")!;
-const resetDbBtn = document.getElementById("reset-db-btn")!;
 const historyToggleBtn = document.getElementById("history-toggle")!;
 const historyOverlay = document.getElementById("history-overlay")!;
 const historyClose = document.getElementById("history-close")!;
 const newChatBtn = document.getElementById("new-chat-btn")!;
 
-// Database management
+// Database export
 async function downloadSqlDump(): Promise<void> {
   try {
     const response = await fetch("/api/export/sql");
@@ -35,26 +32,6 @@ async function downloadSqlDump(): Promise<void> {
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
     addMessage("error", `Error al descargar dump SQL: ${message}`);
-  }
-}
-
-async function resetDatabase(): Promise<void> {
-  if (!confirm("Esto va a borrar todos los datos. ¿Estás seguro?")) return;
-
-  try {
-    await fetch("/api/sql", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query:
-          "DROP TABLE IF EXISTS recipes; DROP TABLE IF EXISTS recipe_ingredients; DROP TABLE IF EXISTS recipe_steps; DROP TABLE IF EXISTS meal_plans; DROP TABLE IF EXISTS meal_prep_batches; DROP TABLE IF EXISTS batch_consumption; DROP TABLE IF EXISTS conversations;",
-      }),
-    });
-
-    window.location.reload();
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Unknown error";
-    addMessage("error", `Error al resetear la base de datos: ${message}`);
   }
 }
 
@@ -81,8 +58,6 @@ userInput.addEventListener("input", () => {
 });
 
 downloadSqlBtn.addEventListener("click", downloadSqlDump);
-resetDbBtn.addEventListener("click", resetDatabase);
-configToggle.addEventListener("click", () => configPanel.classList.toggle("hidden"));
 historyToggleBtn.addEventListener("click", toggleHistoryPanel);
 historyOverlay.addEventListener("click", closeHistoryPanel);
 historyClose.addEventListener("click", closeHistoryPanel);
