@@ -85,6 +85,10 @@ export function removeQueriesAccordion(): void {
   }
 }
 
+export function resetQueriesAccordion(): void {
+  queriesAccordion = null;
+}
+
 export function addQueryToAccordion(query: string): void {
   if (!queriesAccordion) {
     queriesAccordion = document.createElement("div");

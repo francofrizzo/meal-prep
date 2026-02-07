@@ -1,5 +1,5 @@
 import { ChatMessage, Conversation } from "./types";
-import { addMessage, clearChat, renderHistoryPanel, closeHistoryPanel } from "./ui";
+import { addMessage, clearChat, renderHistoryPanel, closeHistoryPanel, addQueryToAccordion, resetQueriesAccordion } from "./ui";
 
 export const conversationHistory: ChatMessage[] = [];
 let conversations: Conversation[] = [];
@@ -94,9 +94,28 @@ export function startNewChat(): void {
 
 function renderChat(): void {
   clearChat();
+  resetQueriesAccordion();
   conversationHistory.forEach((msg) => {
-    if (msg.role === "user" || msg.role === "assistant") {
-      addMessage(msg.role, msg.content || "");
+    if (msg.role === "user") {
+      addMessage("user", msg.content || "");
+    } else if (msg.role === "assistant") {
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        for (const tc of msg.tool_calls) {
+          if (tc.function.name === "execute_sql") {
+            try {
+              const args = JSON.parse(tc.function.arguments) as { query: string };
+              addQueryToAccordion(args.query);
+            } catch {
+              addQueryToAccordion(tc.function.arguments);
+            }
+          }
+        }
+        if (msg.content) {
+          addMessage("assistant", msg.content);
+        }
+      } else {
+        addMessage("assistant", msg.content || "");
+      }
     }
   });
 }
