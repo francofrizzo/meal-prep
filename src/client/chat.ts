@@ -13,7 +13,7 @@ const SYSTEM_PROMPT = `You are a meal prep assistant with SQLite database access
 By default, use Argentine Spanish for all text, both in chat and in the database, unless the user uses a different language.
 
 SCHEMA:
-recipes (id TEXT PK, name, type ['main'|'side'|'base'], servings INT, yield_amount REAL, yield_unit, frozen_shelf_life_days INT, fridge_shelf_life_days INT)
+recipes (id TEXT PK, name, type ['main'|'side'|'base'], servings INT, yield_amount REAL, yield_unit, frozen_shelf_life_days INT, fridge_shelf_life_days INT, has_meal_prep_steps INT)
 ingredients (id TEXT PK, name, type ['Meat'|'Poultry'|'Fish'|'Vegetables'|'Fruits'|'Dairy'|'Deli/Cheese'|'Pantry/Canned'|'Condiments'|'Other'])
 steps (id TEXT PK, recipe_id FK, description, phase ['meal-prep'|'day-of-eating'], order_num INT, duration_minutes INT)
 step_dependencies (step_id FK, depends_on_step_id FK) — composite PK
