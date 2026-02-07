@@ -113,7 +113,7 @@ export function addQueryToAccordion(query: string): void {
 
   const queryItem = document.createElement("div");
   queryItem.className =
-    "my-0.5 px-2 py-1 bg-term-bg rounded text-[11px] whitespace-pre-wrap break-all text-term-accent-dim font-mono border border-term-border";
+    "my-0.5 px-2 py-1 bg-term-accent/5 rounded text-[11px] whitespace-pre-wrap break-all text-term-accent-dim font-mono";
   queryItem.textContent = query;
 
   const content = queriesAccordion.querySelector(".queries-content")!;
