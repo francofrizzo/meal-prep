@@ -4,8 +4,9 @@
   "description": "Meal prep chat application with LLM integration",
   "main": "dist/server/index.js",
   "scripts": {
-    "build": "npm run build:server && npm run build:client && npm run build:css && npm run build:static",
+    "build": "npm run build:server && npm run build:mcp && npm run build:client && npm run build:css && npm run build:static",
     "build:server": "tsc",
+    "build:mcp": "node build-mcp.mjs",
     "build:client": "esbuild src/client/main.ts --bundle --minify --sourcemap --target=es2020 --outfile=dist/public/bundle.js",
     "build:css": "npx @tailwindcss/cli -i src/client/styles.css -o dist/public/styles.css --minify",
     "build:static": "mkdir -p dist/public && cp public/index.html dist/public/",

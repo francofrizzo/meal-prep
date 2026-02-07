@@ -1,42 +1,21 @@
 import "dotenv/config";
 import express from "express";
 import path from "path";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { initSchema } from "./db";
 import sqlRoutes from "./routes/sql";
 import chatRoutes from "./routes/chat";
 import conversationRoutes from "./routes/conversations";
 import exportRoutes from "./routes/export";
 
-import { registerQueryTool } from "../mcp/tools/query.js";
-import { registerRecipeTools } from "../mcp/tools/recipes.js";
-import { registerStepTools } from "../mcp/tools/steps.js";
-import { registerIngredientTools } from "../mcp/tools/ingredients.js";
-import { registerResourceTools } from "../mcp/tools/resources.js";
-import { registerPlanningTools } from "../mcp/tools/planning.js";
-import { registerSessionTools } from "../mcp/tools/sessions.js";
-import { registerConsumptionTools } from "../mcp/tools/consumption.js";
-import { registerSchemaResource } from "../mcp/resources/schema.js";
-
-function createMcpServer(): McpServer {
-  const server = new McpServer({
-    name: "meal-prep",
-    version: "1.0.0",
-  });
-
-  registerQueryTool(server);
-  registerRecipeTools(server);
-  registerStepTools(server);
-  registerIngredientTools(server);
-  registerResourceTools(server);
-  registerPlanningTools(server);
-  registerSessionTools(server);
-  registerConsumptionTools(server);
-  registerSchemaResource(server);
-
-  return server;
-}
+// Loaded at runtime from the esbuild-bundled MCP setup
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { handleMcpRequest } = require("../mcp/setup.js") as {
+  handleMcpRequest: (
+    req: import("http").IncomingMessage,
+    res: import("http").ServerResponse,
+    body: unknown,
+  ) => Promise<void>;
+};
 
 const app = express();
 
@@ -61,15 +40,7 @@ app.all("/mcp", async (req, res) => {
     }
   }
 
-  const server = createMcpServer();
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-  });
-
-  await server.connect(transport);
-  await transport.handleRequest(req, res, req.body);
-  await transport.close();
-  await server.close();
+  await handleMcpRequest(req, res, req.body);
 });
 
 app.get("*", (_req, res) => {
