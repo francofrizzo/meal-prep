@@ -7,6 +7,7 @@ import {
   addQueryToAccordion,
 } from "./ui";
 import { conversationHistory, saveCurrentConversation } from "./conversations";
+import { encode as toonEncode } from "@toon-format/toon";
 
 const SYSTEM_PROMPT = `You are a meal prep assistant with SQLite database access via the execute_sql tool.
 
@@ -44,7 +45,13 @@ KEY BEHAVIORS:
 - If shelf life not provided: estimate based on food type and confirm with user before saving
 - When adding recipe steps: infer dependencies from ingredient/output flow, but avoid over-serializing. Confirm your reasoning. Independent prep steps (chopping, etc.) can be parallel.
 - Ask for clarification when genuinely ambiguous (multiple batches to choose from, vague quantities). Don't ask for things you can reasonably infer.
-- Proactively warn about items expiring within 2 days when showing inventory.`;
+- Proactively warn about items expiring within 2 days when showing inventory.
+- Tool results use TOON (Token-Oriented Object Notation), a compact tabular format. Arrays of objects appear as header[N]{fields}: followed by CSV-like rows.
+- Large tool results may be truncated to a summary with sample rows. Ask for more rows if needed.`;
+
+const MAX_TOOL_ROWS = 50;
+const TOOL_SAMPLE_ROWS = 10;
+const MAX_HISTORY_MESSAGES = 40;
 
 const TOOL_DEFINITION: ToolDefinition = {
   type: "function",
@@ -100,6 +107,88 @@ async function executeSQL(query: string): Promise<SqlResult> {
   return (await response.json()) as SqlResult;
 }
 
+function formatSqlResult(result: SqlResult): string {
+  if (result.error) {
+    return JSON.stringify(result);
+  }
+
+  if (result.rows && result.rows.length > MAX_TOOL_ROWS) {
+    const columns = Object.keys(result.rows[0] || {});
+    const sampleRows = result.rows.slice(0, TOOL_SAMPLE_ROWS);
+    const summary: Record<string, unknown> = {
+      row_count: result.rows.length,
+      columns,
+      sample_rows: sampleRows,
+    };
+    const payload: Record<string, unknown> = { summary };
+
+    if (typeof result.changes === "number") {
+      payload.changes = result.changes;
+    }
+    if (typeof result.lastID === "number") {
+      payload.lastID = result.lastID;
+    }
+
+    return `TRUNCATED: showing first ${sampleRows.length} of ${result.rows.length} rows.\n${toonEncode(payload)}`;
+  }
+
+  return toonEncode(result);
+}
+
+function summarizeOlderMessages(messages: ChatMessage[]): string {
+  const userQuestions: string[] = [];
+  const sqlQueries: string[] = [];
+  const assistantActions: string[] = [];
+
+  for (const msg of messages) {
+    if (msg.role === "user" && msg.content) {
+      userQuestions.push(msg.content.slice(0, 80));
+    } else if (msg.role === "assistant") {
+      if (msg.tool_calls) {
+        for (const tc of msg.tool_calls) {
+          if (tc.function.name === "execute_sql") {
+            try {
+              const args = JSON.parse(tc.function.arguments) as { query: string };
+              sqlQueries.push(args.query.slice(0, 120));
+            } catch {
+              // skip
+            }
+          }
+        }
+      } else if (msg.content) {
+        assistantActions.push(msg.content.slice(0, 100));
+      }
+    }
+    // tool results are dropped from summary — they're the big token cost
+  }
+
+  const parts: string[] = ["[Conversation summary — earlier messages omitted]"];
+
+  if (userQuestions.length > 0) {
+    parts.push("User asked about: " + userQuestions.join(" | "));
+  }
+  if (sqlQueries.length > 0) {
+    parts.push("Queries run: " + sqlQueries.join(" | "));
+  }
+  if (assistantActions.length > 0) {
+    parts.push("Assistant responses: " + assistantActions.join(" | "));
+  }
+
+  return parts.join("\n");
+}
+
+function getConversationWindow(history: ChatMessage[]): ChatMessage[] {
+  if (history.length <= MAX_HISTORY_MESSAGES) {
+    return history;
+  }
+
+  const recent = history.slice(-MAX_HISTORY_MESSAGES);
+  const older = history.slice(0, -MAX_HISTORY_MESSAGES);
+  const summary = summarizeOlderMessages(older);
+
+  return [{ role: "user", content: summary }, ...recent];
+}
+
 export async function handleUserMessage(
   text: string,
   sendBtn: HTMLButtonElement,
@@ -121,12 +210,12 @@ export async function handleUserMessage(
     const currentDate = now.toISOString().split("T")[0];
     const currentTime = now.toTimeString().split(" ")[0].slice(0, 5);
     const dayOfWeek = now.toLocaleDateString("es-AR", { weekday: "long" });
-    const systemPromptWithDate =
-      SYSTEM_PROMPT + `\n\nCURRENT: ${dayOfWeek}, ${currentDate} ${currentTime}`;
+    const currentContext = `CURRENT: ${dayOfWeek}, ${currentDate} ${currentTime}`;
 
     const messages: ChatMessage[] = [
-      { role: "system", content: systemPromptWithDate },
-      ...conversationHistory,
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: currentContext },
+      ...getConversationWindow(conversationHistory),
     ];
 
     const maxIterations = 20;
@@ -174,7 +263,7 @@ export async function handleUserMessage(
 
             addQueryToAccordion(args.query);
             const result = await executeSQL(args.query);
-            const resultStr = JSON.stringify(result, null, 2);
+            const resultStr = formatSqlResult(result);
 
             const toolResult: ChatMessage = {
               role: "tool",

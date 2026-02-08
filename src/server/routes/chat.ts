@@ -3,30 +3,64 @@ import { ChatRequestBody, AnthropicResponse } from "../types";
 
 const router = Router();
 
+type Provider = "anthropic" | "openai";
+
+function getProvider(model: string): Provider {
+  if (model.startsWith("claude-")) return "anthropic";
+  return "openai";
+}
+
+const MODEL = process.env.MODEL_NAME || "claude-sonnet-4-5-20250929";
+const PROVIDER = getProvider(MODEL);
+
 router.post("/", async (req: Request, res: Response) => {
   const { messages, tools, tool_choice } = req.body as ChatRequestBody;
 
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY) {
-    res.status(500).json({ error: "No API key configured" });
+  const apiKey =
+    PROVIDER === "anthropic"
+      ? process.env.ANTHROPIC_API_KEY
+      : process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    const keyName = PROVIDER === "anthropic" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY";
+    res.status(500).json({ error: `${keyName} is required for model ${MODEL}` });
     return;
   }
 
   try {
-    const useAnthropic = !!process.env.ANTHROPIC_API_KEY;
+    if (PROVIDER === "anthropic") {
+      const systemMessages = messages
+        .filter((m) => m.role === "system")
+        .map((m) => m.content)
+        .filter((content): content is string => !!content);
+      const system =
+        systemMessages.length > 0
+          ? [
+              {
+                type: "text",
+                text: systemMessages[0],
+                cache_control: { type: "ephemeral" },
+              },
+              ...systemMessages.slice(1).map((text) => ({
+                type: "text",
+                text,
+              })),
+            ]
+          : undefined;
 
-    if (useAnthropic) {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": process.env.ANTHROPIC_API_KEY!,
+          "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
+          "anthropic-beta": "prompt-caching-2024-07-31",
         },
         body: JSON.stringify({
-          model: process.env.MODEL_NAME || "claude-sonnet-4-5-20250929",
+          model: MODEL,
           max_tokens: 4096,
           messages: messages.filter((m) => m.role !== "system"),
-          system: messages.find((m) => m.role === "system")?.content,
+          system,
           tools: tools?.map((t) => ({
             name: t.function.name,
             description: t.function.description,
@@ -66,10 +100,10 @@ router.post("/", async (req: Request, res: Response) => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: process.env.MODEL_NAME || "gpt-4o",
+          model: MODEL,
           messages,
           tools,
           tool_choice,
