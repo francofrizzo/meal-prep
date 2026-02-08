@@ -100,18 +100,16 @@ function renderChat(): void {
       addMessage("user", msg.content || "");
     } else if (msg.role === "assistant") {
       if (msg.tool_calls && msg.tool_calls.length > 0) {
+        const assistantEl = addMessage("assistant", msg.content || "");
         for (const tc of msg.tool_calls) {
           if (tc.function.name === "execute_sql") {
             try {
               const args = JSON.parse(tc.function.arguments) as { query: string };
-              addQueryToAccordion(args.query);
+              addQueryToAccordion(args.query, assistantEl);
             } catch {
-              addQueryToAccordion(tc.function.arguments);
+              addQueryToAccordion(tc.function.arguments, assistantEl);
             }
           }
-        }
-        if (msg.content) {
-          addMessage("assistant", msg.content);
         }
       } else {
         addMessage("assistant", msg.content || "");

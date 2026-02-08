@@ -3,8 +3,6 @@ import DOMPurify from "dompurify";
 
 const chatContainer = document.getElementById("chat-container")!;
 
-let queriesAccordion: HTMLElement | null = null;
-
 const ALLOWED_TAGS = [
   "p", "br", "strong", "em", "a", "ul", "ol", "li",
   "h1", "h2", "h3", "h4", "code", "pre", "blockquote", "hr",
@@ -79,44 +77,48 @@ export function removeTypingIndicator(): void {
 }
 
 export function removeQueriesAccordion(): void {
-  if (queriesAccordion && queriesAccordion.parentNode) {
-    queriesAccordion.parentNode.removeChild(queriesAccordion);
-    queriesAccordion = null;
-  }
+  // No-op: queries are now attached to each assistant message.
 }
 
 export function resetQueriesAccordion(): void {
-  queriesAccordion = null;
+  // No-op: queries are now attached to each assistant message.
 }
 
-export function addQueryToAccordion(query: string): void {
-  if (!queriesAccordion) {
-    queriesAccordion = document.createElement("div");
-    queriesAccordion.className = "queries-accordion my-1 text-[11px]";
+function getOrCreateQueriesAccordion(parent: HTMLElement): HTMLElement {
+  let accordion = parent.querySelector(".queries-accordion") as HTMLElement | null;
+  if (!accordion) {
+    accordion = document.createElement("div");
+    accordion.className = "queries-accordion my-1 text-[11px]";
 
     const header = document.createElement("div");
     header.className =
       "queries-header flex items-center gap-1.5 py-0.5 cursor-pointer text-term-text-muted hover:text-term-text-dim select-none";
     header.textContent = "queries ejecutadas";
     header.addEventListener("click", () => {
-      queriesAccordion!.classList.toggle("open");
+      accordion!.classList.toggle("open");
     });
 
     const content = document.createElement("div");
     content.className = "queries-content pl-3 pt-1";
 
-    queriesAccordion.appendChild(header);
-    queriesAccordion.appendChild(content);
-
-    chatContainer.appendChild(queriesAccordion);
+    accordion.appendChild(header);
+    accordion.appendChild(content);
+    parent.appendChild(accordion);
   }
+
+  return accordion;
+}
+
+export function addQueryToAccordion(query: string, parent?: HTMLElement): void {
+  const target = parent || chatContainer;
+  const accordion = getOrCreateQueriesAccordion(target);
 
   const queryItem = document.createElement("div");
   queryItem.className =
     "my-0.5 px-2 py-1 bg-term-accent/5 rounded text-[11px] whitespace-pre-wrap break-all text-term-accent-dim font-mono";
   queryItem.textContent = query;
 
-  const content = queriesAccordion.querySelector(".queries-content")!;
+  const content = accordion.querySelector(".queries-content")!;
   content.appendChild(queryItem);
 
   chatContainer.scrollTop = chatContainer.scrollHeight;

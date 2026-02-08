@@ -3,7 +3,6 @@ import {
   addMessage,
   addTypingIndicator,
   removeTypingIndicator,
-  removeQueriesAccordion,
   addQueryToAccordion,
 } from "./ui";
 import { conversationHistory, saveCurrentConversation } from "./conversations";
@@ -196,7 +195,6 @@ export async function handleUserMessage(
 ): Promise<void> {
   if (!text.trim()) return;
 
-  removeQueriesAccordion();
   addMessage("user", text);
   conversationHistory.push({ role: "user", content: text });
 
@@ -234,6 +232,7 @@ export async function handleUserMessage(
       const message = choice.message;
 
       if (message.tool_calls && message.tool_calls.length > 0) {
+        let currentAssistantMessageEl: HTMLElement | null = null;
         conversationHistory.push({
           role: "assistant",
           content: message.content || null,
@@ -242,7 +241,7 @@ export async function handleUserMessage(
 
         if (message.content) {
           removeTypingIndicator();
-          addMessage("assistant", message.content);
+          currentAssistantMessageEl = addMessage("assistant", message.content);
           addTypingIndicator();
         }
 
@@ -261,7 +260,10 @@ export async function handleUserMessage(
               args = { query: toolCall.function.arguments };
             }
 
-            addQueryToAccordion(args.query);
+            if (!currentAssistantMessageEl) {
+              currentAssistantMessageEl = addMessage("assistant", "");
+            }
+            addQueryToAccordion(args.query, currentAssistantMessageEl);
             const result = await executeSQL(args.query);
             const resultStr = formatSqlResult(result);
 
