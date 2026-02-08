@@ -6,7 +6,9 @@ import {
   saveCurrentConversation,
   startNewChat,
   initConversations,
+  conversationHistory,
 } from "./conversations";
+import type { ChatMessage } from "./types";
 
 const userInput = document.getElementById("user-input") as HTMLTextAreaElement;
 const sendBtn = document.getElementById("send-btn") as HTMLButtonElement;
@@ -15,6 +17,16 @@ const historyToggleBtn = document.getElementById("history-toggle")!;
 const historyOverlay = document.getElementById("history-overlay")!;
 const historyClose = document.getElementById("history-close")!;
 const newChatBtn = document.getElementById("new-chat-btn")!;
+
+declare global {
+  interface Window {
+    mealPrepDebug?: {
+      getHistory: () => ChatMessage[];
+      printHistory: () => void;
+      getLastToolCalls: () => ChatMessage[];
+    };
+  }
+}
 
 // Database export
 async function downloadSqlDump(): Promise<void> {
@@ -72,3 +84,15 @@ loadConversations().then(() => {
   startNewChat();
   userInput.focus();
 });
+
+window.mealPrepDebug = {
+  getHistory: () => conversationHistory,
+  printHistory: () => {
+    // eslint-disable-next-line no-console
+    console.log(conversationHistory);
+  },
+  getLastToolCalls: () =>
+    conversationHistory.filter(
+      (m) => m.role === "assistant" && m.tool_calls && m.tool_calls.length > 0,
+    ),
+};
