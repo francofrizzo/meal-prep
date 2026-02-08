@@ -216,6 +216,7 @@ export async function handleUserMessage(
       ...getConversationWindow(conversationHistory),
     ];
 
+    const pendingQueries: string[] = [];
     const maxIterations = 20;
     let iteration = 0;
 
@@ -232,7 +233,6 @@ export async function handleUserMessage(
       const message = choice.message;
 
       if (message.tool_calls && message.tool_calls.length > 0) {
-        let currentAssistantMessageEl: HTMLElement | null = null;
         conversationHistory.push({
           role: "assistant",
           content: message.content || null,
@@ -241,7 +241,7 @@ export async function handleUserMessage(
 
         if (message.content) {
           removeTypingIndicator();
-          currentAssistantMessageEl = addMessage("assistant", message.content);
+          addMessage("assistant", message.content);
           addTypingIndicator();
         }
 
@@ -260,10 +260,7 @@ export async function handleUserMessage(
               args = { query: toolCall.function.arguments };
             }
 
-            if (!currentAssistantMessageEl) {
-              currentAssistantMessageEl = addMessage("assistant", "");
-            }
-            addQueryToAccordion(args.query, currentAssistantMessageEl);
+            pendingQueries.push(args.query);
             const result = await executeSQL(args.query);
             const resultStr = formatSqlResult(result);
 
@@ -280,7 +277,11 @@ export async function handleUserMessage(
         const assistantText = message.content || "(Sin respuesta)";
         conversationHistory.push({ role: "assistant", content: assistantText });
         removeTypingIndicator();
-        addMessage("assistant", assistantText);
+        const assistantEl = addMessage("assistant", assistantText);
+        for (const q of pendingQueries) {
+          addQueryToAccordion(q, assistantEl);
+        }
+        pendingQueries.length = 0;
         await saveCurrentConversation();
         break;
       }
