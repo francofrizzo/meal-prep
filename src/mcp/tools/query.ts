@@ -7,7 +7,7 @@ const READ_ONLY_PATTERN = /^\s*(SELECT|WITH|EXPLAIN)\b/i;
 export function registerQueryTool(server: McpServer): void {
   server.tool(
     "query",
-    "Execute a read-only SQL query against the meal-prep database. Supports SELECT, WITH...SELECT, and EXPLAIN statements. Use the mealprep://schema resource to discover table structures.",
+    "Execute a read-only SQL query against the meal-prep database. Supports SELECT, WITH...SELECT, and EXPLAIN statements. Use the mealprep://schema resource to discover tables and views. IMPORTANT: Always check for existing views (SELECT name FROM sqlite_master WHERE type='view') before writing manual queries, and prefer using them when available — they encapsulate common joins and aggregations (e.g. batch_stock, recipe_stock).",
     { sql: z.string().describe("The SQL query to execute (read-only)") },
     async ({ sql }) => {
       if (!READ_ONLY_PATTERN.test(sql)) {

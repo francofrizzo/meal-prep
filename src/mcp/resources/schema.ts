@@ -5,7 +5,7 @@ export function registerSchemaResource(server: McpServer): void {
   server.resource(
     "schema",
     "mealprep://schema",
-    { description: "Complete database schema for all meal-prep tables and views (excludes conversations)" },
+    { description: "Complete database schema for all meal-prep tables and views (excludes conversations). Check views first — they provide pre-built joins and aggregations (e.g. batch_stock, recipe_stock) that should be preferred over manual queries." },
     async (uri) => {
       const tables = db
         .prepare(
