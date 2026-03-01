@@ -19,7 +19,7 @@ steps (id TEXT PK, recipe_id FK, description, phase ['meal-prep'|'day-of-eating'
 step_dependencies (step_id FK, depends_on_step_id FK) — composite PK
 step_ingredients (step_id FK, ingredient_id FK, quantity, unit) — composite PK
 resources (id TEXT PK, name, type ['oven'|'pan'|'pot'|'stove'])
-step_resource_usage (step_id FK, resource_id FK, temperature_celsius INT, notes) — composite PK
+step_resource_usage (step_id FK, resource_id FK, quantity INT DEFAULT 1, temperature_celsius INT, notes) — composite PK
 meal_prep_sessions (id TEXT PK, date, notes, gantt TEXT — optional .gantt format diagram: VERSION 1, START/END HH:MM, LANES section (people/equipment like 'Persona: 2', 'Horno', 'Hornalla: 4'), TASKS section (pipe-separated: Name | Duration | Lane(s) | Color | Dependencies | @Start). Lane specifiers: 'Persona' (any), 'Persona#1' (specific), 'Persona*2' (multiple), 'Persona(P)' (passive))
 batches (id TEXT PK, recipe_id FK, session_id FK, servings_produced INT, prep_date)
 consumptions (id TEXT PK, batch_id FK, servings_consumed INT, consumption_date)

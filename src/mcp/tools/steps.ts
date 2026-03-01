@@ -77,6 +77,7 @@ export function registerStepTools(server: McpServer): void {
         .array(
           z.object({
             resource_id: z.string(),
+            quantity: z.number().int().optional().describe("How many of this resource are needed (default 1)"),
             temperature_celsius: z.number().int().optional(),
             notes: z.string().optional(),
           }),
@@ -354,12 +355,13 @@ export function registerStepTools(server: McpServer): void {
                 "DELETE FROM step_resource_usage WHERE step_id = ?",
               ).run(stepId);
               const insert = db.prepare(
-                "INSERT INTO step_resource_usage (step_id, resource_id, temperature_celsius, notes) VALUES (?, ?, ?, ?)",
+                "INSERT INTO step_resource_usage (step_id, resource_id, quantity, temperature_celsius, notes) VALUES (?, ?, ?, ?, ?)",
               );
               for (const r of res) {
                 insert.run(
                   stepId,
                   r.resource_id,
+                  r.quantity ?? 1,
                   r.temperature_celsius ?? null,
                   r.notes ?? null,
                 );
